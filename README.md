@@ -1,6 +1,6 @@
 # URL Shortener
 
-A simple FastAPI-based URL shortener with a dashboard UI.
+A simple FastAPI-based URL shortener with a dashboard UI. Uses Base62 algorithm to genarate short codes uniquely.
 
 ## Features
 
