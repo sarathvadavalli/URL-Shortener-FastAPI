@@ -11,7 +11,10 @@ class URLRepository:
         self.db = db
 
     def create(self, payload: URLMappingCreate) -> URLMapping:
-        short_code = self._generate_short_code()
+        last_mapping = self.db.query(URLMapping).order_by(URLMapping.url_id.desc()).first()
+        next_id = (last_mapping.url_id if last_mapping is not None else 0) + 1
+        short_code = self._generate_short_code(next_id)
+
         mapping = URLMapping(
             original_url=str(payload.original_url),
             short_code=short_code,
@@ -78,19 +81,25 @@ class URLRepository:
         self.db.refresh(click)
         return str(mapping.original_url)
 
-    def _generate_short_code(self) -> str:
-        while True:
-            short_code = self._random_code(6)
-            if self.get_by_short_code(short_code, None, None) is None:
-                return short_code
+    
+    def _generate_short_code(self, url_id: int) -> str:
+        return self._encode_base62(url_id)
 
     @staticmethod
-    def _random_code(length: int) -> str:
-        import secrets
-        import string
+    def _encode_base62(value: int) -> str:
+        if value < 0:
+            raise ValueError("value must be non-negative")
 
-        alphabet = string.ascii_letters + string.digits
-        return "".join(secrets.choice(alphabet) for _ in range(length))
+        alphabet = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        if value == 0:
+            return "0"
+
+        encoded = []
+        while value > 0:
+            value, remainder = divmod(value, 62)
+            encoded.append(alphabet[remainder])
+
+        return "".join(reversed(encoded))
 
     @staticmethod
     def _utcnow():
