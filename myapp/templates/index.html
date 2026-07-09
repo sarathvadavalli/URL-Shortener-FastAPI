@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <div class="row">
+    <div class="col-md-8">
+      <h1>URL SHORTENER DASHBOARD</h1>
+      <div class="mt-4 mb-4">
+        <p><strong>Total URLs</strong> &nbsp;&nbsp;: {{ total_urls }}</p>
+        <p><strong>Total Clicks</strong> &nbsp;&nbsp;: {{ total_clicks }}</p>
+      </div>
+      <div class="mb-4">
+        <a class="btn btn-primary me-2" href="/urls/create">Create URL</a>
+        <a class="btn btn-secondary" href="/urls">View All URL Details</a>
+      </div>
+
+      <h5>Recent URLs</h5>
+      <table class="table table-striped">
+        <thead>
+          <tr><th>ID</th><th>Short Code</th><th>Original URL</th><th>Actions</th></tr>
+        </thead>
+        <tbody>
+          {% for u in recent %}
+          <tr>
+            <td>{{ u.url_id }}</td>
+            <td>{{ u.short_code }}</td>
+            <td style="max-width:400px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ u.original_url }}</td>
+            <td>
+              <a class="btn btn-sm btn-outline-primary" href="/urls/{{ u.url_id }}">View</a>
+              <a class="btn btn-sm btn-outline-secondary" href="/urls/{{ u.url_id }}/edit">Edit</a>
+              <form style="display:inline" method="post" action="/urls/{{ u.url_id }}/delete">
+                <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endblock %}

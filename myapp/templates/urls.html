@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <h2>All URLs</h2>
+  <table class="table table-hover mt-3">
+    <thead>
+      <tr><th>ID</th><th>Short Code</th><th>Original URL</th><th>Created</th><th>Actions</th></tr>
+    </thead>
+    <tbody>
+      {% for u in urls %}
+      <tr>
+        <td>{{ u.url_id }}</td>
+        <td>{{ u.short_code }}</td>
+        <td style="max-width:500px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ u.original_url }}</td>
+        <td>{{ u.created_at }}</td>
+        <td>
+          <a class="btn btn-sm btn-primary" href="/urls/{{ u.url_id }}">View</a>
+          <a class="btn btn-sm btn-secondary" href="/urls/{{ u.url_id }}/edit">Edit</a>
+          <form style="display:inline" method="post" action="/urls/{{ u.url_id }}/delete">
+            <button class="btn btn-sm btn-danger" type="submit">Delete</button>
+          </form>
+          <a class="btn btn-sm btn-outline-info" href="/urls/{{ u.url_id }}/analytics/view">View Analytics</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endblock %}

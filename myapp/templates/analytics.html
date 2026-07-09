@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <h2>Analytics</h2>
+  {% if analytics %}
+    <table class="table table-sm mt-3">
+      <thead><tr><th>Clicked At</th><th>User Agent</th><th>IP Address</th></tr></thead>
+      <tbody>
+        {% for c in analytics %}
+          <tr>
+            <td>{{ c.clicked_at }}</td>
+            <td>{{ c.user_agent }}</td>
+            <td>{{ c.ip_address }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>No click analytics available.</p>
+  {% endif %}
+{% endblock %}

@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <h2>{% if action == 'create' %}Create URL{% else %}Edit URL{% endif %}</h2>
+  {% if error %}
+    <div class="alert alert-danger">{{ error }}</div>
+  {% endif %}
+  <form method="post" class="mt-3">
+    <div class="mb-3">
+      <label class="form-label">Original URL</label>
+      <input name="original_url" class="form-control" type="text" value="{{ url.original_url if url else '' }}" required>
+    </div>
+    <button class="btn btn-primary" type="submit">{% if action == 'create' %}Create{% else %}Save{% endif %}</button>
+    <a class="btn btn-secondary" href="/">Cancel</a>
+  </form>
+{% endblock %}
