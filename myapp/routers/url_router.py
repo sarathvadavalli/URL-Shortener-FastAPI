@@ -2,6 +2,7 @@ from typing import List
 from urllib import request
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -80,13 +81,18 @@ def url_analytics(id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/{short_code}")
-def redirect(short_code: str, request: Request, db: Session = Depends(get_db)):
+async def redirect(short_code: str, request: Request, db: Session = Depends(get_db)):
     """Redirect by short code to the original URL."""
     user_agent = request.headers.get("user-agent")
     ip_address = request.client.host if request.client else None
 
     url_service = URLService(db)
-    original = url_service.get_original_by_code(short_code, user_agent=user_agent, ip_address=ip_address)
+    original = await run_in_threadpool(
+        url_service.get_original_by_code,
+        short_code,
+        user_agent=user_agent,
+        ip_address=ip_address,
+    )
     if original is None:
         raise HTTPException(status_code=404, detail="Short code not found")
 
