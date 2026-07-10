@@ -11,6 +11,9 @@ class URLRepository:
         self.db = db
 
     def create(self, payload: URLMappingCreate) -> URLMapping:
+        if(self.db.query(URLMapping).filter(URLMapping.original_url == str(payload.original_url)).first() is not None):
+            raise ValueError("URL already exists")
+
         last_mapping = self.db.query(URLMapping).order_by(URLMapping.url_id.desc()).first()
         next_id = (last_mapping.url_id if last_mapping is not None else 0) + 1
         short_code = self._generate_short_code(next_id)
