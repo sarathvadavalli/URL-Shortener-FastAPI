@@ -1,13 +1,17 @@
+from datetime import datetime, timezone
 from fastapi import APIRouter, Request, Form, Depends, status
 from fastapi.responses import RedirectResponse, HTMLResponse
 from pydantic import ValidationError
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
+from starlette.concurrency import run_in_threadpool
+
 from myapp.database import get_db
 from myapp.services.url_service import URLService
 from myapp.schemas.url_mapping import URLMappingCreate
 from myapp.models.url_mapping import URLMapping, Click
+from myapp.tasks import record_click
 
 router = APIRouter()
 
@@ -91,21 +95,37 @@ def url_detail(request: Request, id: int, db: Session = Depends(get_db)):
 
 @router.get("/{short_code}")
 async def redirect(short_code: str, request: Request, db: Session = Depends(get_db)):
-    # Redirect to the original URL by short code
+    url_service = URLService(db)
+
+    # Redis → DB fallback
+    data = await run_in_threadpool(
+        url_service.get_original_by_short_code,
+        short_code,
+    )
+
+    if data is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Short code not found",
+        )
+
     user_agent = request.headers.get("user-agent")
     ip_address = request.client.host if request.client else None
+    clicked_at = datetime.now(timezone.utc)
 
-    url_service = URLService(db)
-    original = await run_in_threadpool(
-        url_service.get_original_by_code,
-        short_code,
-        user_agent=user_agent,
-        ip_address=ip_address,
+    # Send analytics event to Celery
+    record_click.delay(
+        data["url_mapping_id"],
+        ip_address,
+        user_agent,
+        clicked_at,
     )
-    if original is None:
-        raise HTTPException(status_code=404, detail="Short code not found")
 
-    return RedirectResponse(url=original, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+    # Redirects to the original URL
+    return RedirectResponse(
+        url=data["original_url"],
+        status_code=status.HTTP_307_TEMPORARY_REDIRECT,
+    )
 
 
 @router.get("/urls/{id}/analytics/view", include_in_schema=False)

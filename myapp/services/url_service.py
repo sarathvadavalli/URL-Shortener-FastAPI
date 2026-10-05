@@ -1,7 +1,9 @@
+import json
 from datetime import datetime
 from typing import Optional
 from sqlalchemy.orm import Session
 
+from myapp.database import get_db, redis_client
 from myapp.models.url_mapping import Click, URLMapping
 from myapp.schemas.url_mapping import URLMappingCreate
 from myapp.repos.url_repository import URLRepository
@@ -56,5 +58,33 @@ class URLService:
     def get_analytics(self, url_id: int) -> Optional[list[Click]]:
         return self.repository.get_analytics(url_id)
 
-    def get_original_by_code(self, short_code: str):
-        return self.repository.get_by_short_code(short_code)
+
+    def get_original_by_short_code(self, short_code: str):
+        cache_key = f"url:{short_code}"
+
+        # Check Redis if shortcode already exists
+        cached = redis_client.get(cache_key)
+
+        if cached:
+            print("Served from cache..")
+            return json.loads(cached)
+
+        # If cache miss → fetch from DB
+        mapping = self.repository.get_by_short_code(short_code)
+
+        if mapping is None:
+            return None
+
+        data = {
+            "url_mapping_id": mapping.url_id,
+            "original_url": str(mapping.original_url),
+        }
+
+        # 3. Store in Redis
+        redis_client.set(
+            cache_key,
+            json.dumps(data),
+            ex=3600,
+        )
+
+        return data
