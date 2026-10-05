@@ -1,11 +1,12 @@
 from fastapi import APIRouter, Request, Form, Depends, status
 from fastapi.responses import RedirectResponse, HTMLResponse
+from pydantic import ValidationError
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from myapp.database import get_db
 from myapp.services.url_service import URLService
-from myapp.schemas.url_mapping import URLMappingCreate, URLMappingUpdate
+from myapp.schemas.url_mapping import URLMappingCreate
 from myapp.models.url_mapping import URLMapping, Click
 
 router = APIRouter()
@@ -36,18 +37,45 @@ def list_urls(request: Request, db: Session = Depends(get_db)):
 
 @router.get("/urls/create", include_in_schema=False)
 def create_form(request: Request):
-    return render_template("url_form.html", {"request": request, "action": "create"})
+    short_code = request.session.pop("created_short_code", None)
+    return render_template("url_form.html", {"request": request, "action": "create", "short_code": short_code})
 
 
 @router.post("/urls/create", include_in_schema=False)
 def create_url(request: Request, original_url: str = Form(...), db: Session = Depends(get_db)):
+    form_context = {"request": request, "action": "create", "original_url": original_url}
+
     try:
         payload = URLMappingCreate(original_url=original_url)
-    except Exception as e:
-        return render_template("url_form.html", {"request": request, "action": "create", "error": str(e)})
+    except ValidationError as e:
+        messages = [err.get("msg", "") for err in e.errors() if err.get("msg")]
+        error = "; ".join(messages) if messages else str(e)
+        return render_template("url_form.html", {**form_context, "error": error})
 
+    try:
+        service = URLService(db)
+        mapping = service.create_url(payload)
+        if mapping is None:
+            return render_template(
+                "url_form.html",
+                {**form_context, "error": "Failed to create short URL. Please try again."},
+            )
+
+        # Storing the short code in session storage temporarily and popping out in the GET request
+        # Ensures that the shortcode is served only once as a flow: POST → store → redirect → GET → remove
+        request.session["created_short_code"] = mapping.short_code
+        return RedirectResponse(
+            url="/urls/create",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+    except Exception as e:
+        return render_template("url_form.html", {**form_context, "error": str(e)})
+
+
+@router.post("/urls/{id}/delete", include_in_schema=False)
+def delete_url(id: int, db: Session = Depends(get_db)):
     service = URLService(db)
-    service.create_url(payload)
+    service.delete_url(id)
     return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
 
 
@@ -61,34 +89,23 @@ def url_detail(request: Request, id: int, db: Session = Depends(get_db)):
     return render_template("url_detail.html", {"request": request, "url": mapping, "analytics": analytics})
 
 
-@router.get("/urls/{id}/edit", include_in_schema=False)
-def edit_form(request: Request, id: int, db: Session = Depends(get_db)):
-    service = URLService(db)
-    mapping = service.get_url(id)
-    if mapping is None:
-        return RedirectResponse(url="/urls", status_code=status.HTTP_303_SEE_OTHER)
-    return render_template("url_form.html", {"request": request, "action": "edit", "url": mapping})
+@router.get("/{short_code}")
+async def redirect(short_code: str, request: Request, db: Session = Depends(get_db)):
+    # Redirect to the original URL by short code
+    user_agent = request.headers.get("user-agent")
+    ip_address = request.client.host if request.client else None
 
+    url_service = URLService(db)
+    original = await run_in_threadpool(
+        url_service.get_original_by_code,
+        short_code,
+        user_agent=user_agent,
+        ip_address=ip_address,
+    )
+    if original is None:
+        raise HTTPException(status_code=404, detail="Short code not found")
 
-@router.post("/urls/{id}/edit", include_in_schema=False)
-def edit_url(request: Request, id: int, original_url: str = Form(...), db: Session = Depends(get_db)):
-    try:
-        payload = URLMappingUpdate(original_url=original_url)
-    except Exception as e:
-        service = URLService(db)
-        mapping = service.get_url(id)
-        return render_template("url_form.html", {"request": request, "action": "edit", "url": mapping, "error": str(e)})
-
-    service = URLService(db)
-    service.update_url(id, payload)
-    return RedirectResponse(url=f"/urls/{id}", status_code=status.HTTP_303_SEE_OTHER)
-
-
-@router.post("/urls/{id}/delete", include_in_schema=False)
-def delete_url(id: int, db: Session = Depends(get_db)):
-    service = URLService(db)
-    service.delete_url(id)
-    return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse(url=original, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
 
 
 @router.get("/urls/{id}/analytics/view", include_in_schema=False)

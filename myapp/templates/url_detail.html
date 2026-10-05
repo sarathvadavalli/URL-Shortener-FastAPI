@@ -7,10 +7,8 @@
     <dt class="col-sm-3">Short Code</dt><dd class="col-sm-9">{{ url.short_code }}</dd>
     <dt class="col-sm-3">Original URL</dt><dd class="col-sm-9">{{ url.original_url }}</dd>
     <dt class="col-sm-3">Created At</dt><dd class="col-sm-9">{{ url.created_at }}</dd>
-    <dt class="col-sm-3">Updated At</dt><dd class="col-sm-9">{{ url.updated_at }}</dd>
   </dl>
   <div class="mb-3">
-    <a class="btn btn-secondary" href="/urls/{{ url.url_id }}/edit">Edit</a>
     <form style="display:inline" method="post" action="/urls/{{ url.url_id }}/delete">
       <button class="btn btn-danger" type="submit">Delete</button>
     </form>

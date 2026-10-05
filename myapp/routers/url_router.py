@@ -9,7 +9,6 @@ from sqlalchemy.orm import Session
 from myapp.database import get_db
 from myapp.schemas.url_mapping import (
     URLMappingCreate,
-    URLMappingUpdate,
     URLMappingResponse,
     ClickResponse,
 )
@@ -41,17 +40,6 @@ def get_url(id: int, db: Session = Depends(get_db)):
     """Get one URL mapping by id."""
     url_service = URLService(db)
     result = url_service.get_url(id)
-    if result is None:
-        raise HTTPException(status_code=404, detail="URL mapping not found")
-    
-    return result
-
-
-@router.patch("/shorten/{id}", response_model=URLMappingResponse)
-def update_url(id: int, payload: URLMappingUpdate, db: Session = Depends(get_db)):
-    """Partially update a URL mapping."""
-    url_service = URLService(db)
-    result = url_service.update_url(id, payload)
     if result is None:
         raise HTTPException(status_code=404, detail="URL mapping not found")
     

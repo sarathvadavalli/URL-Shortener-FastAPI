@@ -26,7 +26,6 @@
             <td style="max-width:400px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ u.original_url }}</td>
             <td>
               <a class="btn btn-sm btn-outline-primary" href="/urls/{{ u.url_id }}">View</a>
-              <a class="btn btn-sm btn-outline-secondary" href="/urls/{{ u.url_id }}/edit">Edit</a>
               <form style="display:inline" method="post" action="/urls/{{ u.url_id }}/delete">
                 <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
               </form>

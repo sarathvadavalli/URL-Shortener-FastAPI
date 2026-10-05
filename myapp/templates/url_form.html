@@ -5,10 +5,16 @@
   {% if error %}
     <div class="alert alert-danger">{{ error }}</div>
   {% endif %}
+  {% if short_code %}
+    <div class="alert alert-success">
+      Short URL created. Your short code is <strong>{{ short_code }}</strong>
+      (redirect link: <a href="/{{ short_code }}">/{{ short_code }}</a>).
+    </div>
+  {% endif %}
   <form method="post" class="mt-3">
     <div class="mb-3">
       <label class="form-label">Original URL</label>
-      <input name="original_url" class="form-control" type="text" value="{{ url.original_url if url else '' }}" required>
+      <input name="original_url" class="form-control" type="text" value="{{ url.original_url if url else original_url|default('') }}" required>
     </div>
     <button class="btn btn-primary" type="submit">{% if action == 'create' %}Create{% else %}Save{% endif %}</button>
     <a class="btn btn-secondary" href="/">Cancel</a>

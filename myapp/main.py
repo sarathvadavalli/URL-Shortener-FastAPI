@@ -1,13 +1,18 @@
 from datetime import datetime
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.sessions import SessionMiddleware
 
+from myapp.config import settings
 from myapp.database import SessionLocal, init_db
 from myapp.models.url_mapping import URLMapping, Click
 from myapp.routers.url_router import router as api_router
 from myapp.routers.ui_router import router as ui_router
 
 app = FastAPI(title="FIRST PROJECT")
+
+session_secret = settings.SECRET_KEY or "dev-session-secret-change-me"
+app.add_middleware(SessionMiddleware, secret_key=session_secret)
 
 app.include_router(ui_router)
 app.include_router(api_router)
