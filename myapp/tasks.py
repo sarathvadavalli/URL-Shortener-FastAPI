@@ -3,7 +3,7 @@ from fastapi import Depends
 
 from myapp.database import SessionLocal
 from myapp.celery import celery_app
-from myapp.models.url_mapping import Click
+from myapp.models.url_mapping import Click, URLMapping
 
 
 @celery_app.task
@@ -20,6 +20,11 @@ def record_click(url_mapping_id: int, ip_address: str | None,
         )
 
         db.add(click)
+
+        db.query(URLMapping).filter(URLMapping.url_id == url_mapping_id).update({
+            URLMapping.click_count: URLMapping.click_count + 1
+        })
+
         db.commit()
 
     except Exception:

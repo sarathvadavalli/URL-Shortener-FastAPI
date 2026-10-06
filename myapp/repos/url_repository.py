@@ -1,9 +1,11 @@
 from typing import Optional
 
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
 from myapp.models.url_mapping import Click, URLMapping
+from myapp.models.user_model import Users
 from myapp.schemas.url_mapping import URLMappingCreate
 
 
@@ -13,11 +15,10 @@ class URLRepository:
 
 
     # Insert followed by read approach because assuming 90% requests contain new urls and 10% existing ones
-    def create(self, payload: URLMappingCreate, url_id: int, short_code: str) -> URLMapping:
-        original_url = str(payload.original_url)
-
+    def create(self, original_url: str, user_id:int, url_id: int, short_code: str) -> URLMapping:
         mapping = URLMapping(
             url_id=url_id,
+            user_id=user_id,
             original_url=original_url,
             short_code=short_code,
         )
@@ -31,17 +32,6 @@ class URLRepository:
         except IntegrityError as e:
             # Handles duplicate original_urls and returns existing short code
             self.db.rollback()
-
-            existing_mapping = (
-                self.db.query(URLMapping)
-                .filter(URLMapping.original_url == original_url)
-                .first()
-            )
-
-            if existing_mapping:
-                print("Returning existing mapping")
-                return existing_mapping
-
             raise e
         except Exception as e:
             # Handles non-database exceptions (e.g: AttributeError, TypeError)
@@ -50,28 +40,31 @@ class URLRepository:
             raise e
 
 
-    def list_all(self) -> list[URLMapping]:
-        return self.db.query(URLMapping).order_by(URLMapping.url_id.desc()).all()
+    def get_url_by_user_and_original_url(self, user_id: int, original_url: str):
+        return self.db.query(URLMapping).filter(
+                (URLMapping.user_id == user_id) &
+                (URLMapping.original_url == original_url)
+            ).first()
 
 
-    def get_by_id(self, url_id: int) -> Optional[URLMapping]:
-        return self.db.query(URLMapping).filter(URLMapping.url_id == url_id).first()
+    def list_all(self, user: Users) -> list[URLMapping]:
+        return self.db.query(URLMapping).filter(URLMapping.user_id == user.id).order_by(URLMapping.url_id.desc()).all()
 
 
-    def delete(self, url_id: int) -> bool:
-        mapping = self.get_by_id(url_id)
-        if mapping is None:
-            return False
+    def get_by_id(self, url_id: int, user: Users) -> Optional[URLMapping]:
+        return self.db.query(URLMapping).filter(URLMapping.url_id == url_id, URLMapping.user_id == user.id).first()
+        
 
-        self.db.delete(mapping)
-        self.db.commit()
-        return True
+    def delete(self, url_id: int, user: Users) -> Optional[URLMapping]:
+        return (
+            db.query(URLMapping).filter(
+                (URLMapping.url_id == url_id) &
+                (URLMapping.user_id == user.id)
+            ).delete(synchronize_session=False)
+        )
 
 
     def get_analytics(self, url_id: int) -> Optional[list[Click]]:
-        mapping = self.get_by_id(url_id)
-        if mapping is None:
-            return None
         return self.db.query(Click).filter(Click.url_mapping_id == url_id).order_by(Click.clicked_at.desc()).all()
 
 

@@ -1,7 +1,7 @@
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
-from myapp.config import settings
+from myapp.core.config import settings
 
 import redis
 

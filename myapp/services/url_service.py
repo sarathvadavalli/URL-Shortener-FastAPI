@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from myapp.database import get_db, redis_client
 from myapp.models.url_mapping import Click, URLMapping
+from myapp.models.user_model import Users
 from myapp.schemas.url_mapping import URLMappingCreate
 from myapp.repos.url_repository import URLRepository
 from myapp.services.id_generator import IDGenerator
@@ -16,7 +17,12 @@ class URLService:
         self.repository = URLRepository(db)
 
 
-    def create_url(self, payload: URLMappingCreate):
+    def create_url(self, payload: URLMappingCreate, user_id: int):
+        original_url = str(payload.original_url)
+        existing_mapping = self.repository.get_url_by_user_and_original_url(user_id=user_id, original_url=original_url)
+        if existing_mapping:
+            return existing_mapping
+
         # Generate a unique ID through an application level ID-generator
         id_generator = IDGenerator()
         url_id = id_generator.next_id()
@@ -24,7 +30,7 @@ class URLService:
         # Generate short code using base-62 encoding technique
         short_code = self._generate_short_code(url_id)
 
-        return self.repository.create(payload, url_id, short_code)
+        return self.repository.create(original_url, user_id, url_id, short_code)
 
 
     # Using Base-62 encoding of url_id for shortcode generation
@@ -46,14 +52,18 @@ class URLService:
         return "".join(reversed(encoded))
 
 
-    def list_urls(self) -> list[URLMapping]:
-        return self.repository.list_all()
+    def list_urls(self, user: Users) -> list[URLMapping]:
+        return self.repository.list_all(user)
 
-    def get_url(self, url_id: int):
-        return self.repository.get_by_id(url_id)
+    def get_url(self, url_id: int, user: Users):
+        return self.repository.get_by_id(url_id, user)
 
-    def delete_url(self, url_id: int) -> bool:
-        return self.repository.delete(url_id)
+    def delete_url(self, url_id: int, user: Users) -> bool:
+        deleted = self.repository.delete(url_id, user)
+        if deleted == 0:
+            return False
+
+        return True
 
     def get_analytics(self, url_id: int) -> Optional[list[Click]]:
         return self.repository.get_analytics(url_id)
@@ -66,7 +76,6 @@ class URLService:
         cached = redis_client.get(cache_key)
 
         if cached:
-            print("Served from cache..")
             return json.loads(cached)
 
         # If cache miss → fetch from DB
