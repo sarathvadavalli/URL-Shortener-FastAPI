@@ -1,28 +1,37 @@
 # URL Shortener
 
-A simple FastAPI-based URL shortener with a dashboard UI. Uses Base62 algorithm to genarate short codes uniquely.
+URL shortener is a project built with FastAPI, SQLAlchemy and Redis, with Celery used for background processing. Rather than simple CRUD operations, it involves various design features that makes the application to perform well even at scale. It Uses Twitter Snowflake style algorithm to generate unique IDs and Base62 encoding technique to genarate short codes uniquely.
 
 ## Features
 
-- Home dashboard showing total URLs and total clicks
-- Create a new short URL
-- View all URLs and more details about each item
-- Edit or delete existing URLs
-- View analytics for clicks on each URL
-- Redirect short codes to the original URLs
+- Create short URLs from long original URLs (Even without login)
+- JWT-based authentication
+- View and delete URLs belonging to authenticated user
+- Track click counts and analytics of authenticated user
+- Redirect users from a short code to the corresponding original URL quickly without waiting for click record insertion
 
-## Project Structure
+## Tech Stack
 
-- `run.py` — application entry point
-- `myapp/main.py` — FastAPI app setup and router registration
-- `myapp/routers/ui_router.py` — UI routes for dashboard and pages
-- `myapp/routers/url_router.py` — API routes for URL operations and short-code redirect
-- `myapp/services/url_service.py` — business logic layer
-- `myapp/repos/url_repository.py` — database persistence logic
-- `myapp/schemas/url_mapping.py` — Pydantic models for request and response validation
-- `myapp/templates/` — Jinja2 templates for UI pages
-- `myapp/static/` — static CSS assets
-- `.env` — local environment variables (not committed if `.gitignore` is configured)
+- **Frontend**: HTML, CSS, Javascript
+- **Backend**: FastAPI, JWT Authentication, Pydantic, SQLALchemy ORM, Redis, Celery
+- **Database**: MySQL
+
+## Architecture
+
+![System Architecture](Architecture.png)
+
+## Backend Features
+
+- **ID Generation** — Twitter Snowflake style algorithm that combines UNIX timestamp and sequence number. (Can include workerid for distributed servers)
+- **ShortCode Generation** — Uses Base-62 Encoding technique to create short codes since it ensures uniqueness, keeps the length minimum and saves storage.
+- **Data Validation** — Validates the incoming long urls to check if they are in proper format and follow standard HTTP & HTTPS protocols. 
+- **Authentication** — Uses JWT authentication technique that securely stores the token in a HttpOnly cookie with a limited expiry time.
+- **Database Integrity** — Ensures database integrity by adding unique constraint for (user_id, original_url) combination to ensure no duplicate urls are stored corresponding to a user, handling concurrency.
+- **Idempotency** — Redis-based idempotency keys with TTL to prevent processing duplicate short url creation requests.
+- **Caching** — Redis-based caching for fetching original url corresponding to a short url with minimum latency.
+- **Celery** — Handles background processing like creating click records and incrementing count with redis as message broker.
+- **Asynchronous task execution** — Executes the redirect requests asynchronously to avoid blocking the event loop.
+
 
 ## Setup
 
@@ -39,22 +48,30 @@ python -m venv .venv
 python -m pip install -r requirements.txt
 ```
 
-3. Create or update your `.env` file.
+3. Create and configure the variables in `.env` file as specified in .env.example.
 
-Example `.env`:
 
-```env
-DATABASE_URL=<your_db_url>
-DEBUG=true
-```
-
-4. Start the server.
+4. Start the uvicorn ASGI server.
 
 ```bash
-python run.py
+uvicorn myapp.main:app --reload
 ```
 
-5. Open the UI at:
+5. Make sure Redis is running locally on 127.0.0.1:6379 or create a live instance on a cloud platform like Upstash and specify its URL in .env
+
+Verify the Redis connection:
+
+```bash
+   redis-cli ping  # Expected output: PONG
+```
+
+5. Start the celery worker.
+   
+```bash
+celery -A myapp/tasks worker --loglevel=INFO --pool=solo
+```
+
+6. Open the UI at:
 
 ```text
 http://127.0.0.1:8000/
