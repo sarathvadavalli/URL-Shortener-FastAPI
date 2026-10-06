@@ -1,36 +1,54 @@
 {% extends "base.html" %}
 
 {% block content %}
-  <h2>URL Detail</h2>
-  <dl class="row mt-3">
-    <dt class="col-sm-3">ID</dt><dd class="col-sm-9">{{ url.url_id }}</dd>
-    <dt class="col-sm-3">Short Code</dt><dd class="col-sm-9">{{ url.short_code }}</dd>
-    <dt class="col-sm-3">Original URL</dt><dd class="col-sm-9">{{ url.original_url }}</dd>
-    <dt class="col-sm-3">Created At</dt><dd class="col-sm-9">{{ url.created_at }}</dd>
-  </dl>
-  <div class="mb-3">
-    <form style="display:inline" method="post" action="/urls/{{ url.url_id }}/delete">
-      <button class="btn btn-danger" type="submit">Delete</button>
+<main class="app-page">
+  <header class="app-page-header">
+    <div>
+      <p class="app-eyebrow">Link details</p>
+      <h1>Short URL</h1>
+      <p>Review this link and the clicks it has received.</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+      <a class="btn btn-secondary" href="/urls">Back to URLs</a>
+      <a class="btn btn-primary" href="/urls/{{ url.url_id }}/analytics/view">View analytics</a>
+    </div>
+  </header>
+
+  <section class="app-card mb-4">
+    <dl class="row app-details mb-0">
+      <dt class="col-sm-3">Short code</dt><dd class="col-sm-9"><span class="app-code">{{ url.short_code }}</span></dd>
+      <dt class="col-sm-3">Original URL</dt><dd class="col-sm-9 app-break">{{ url.original_url }}</dd>
+      <dt class="col-sm-3">Created at</dt><dd class="col-sm-9">{{ url.created_at }}</dd>
+      <dt class="col-sm-3">Clicked count</dt><dd class="col-sm-9">{{ url.click_count }}</dd>
+    </dl>
+    <form class="mt-3" method="delete" action="/urls/{{ url.url_id }}">
+      <button class="btn btn-outline-danger" type="submit">Delete URL</button>
     </form>
-    <a class="btn btn-outline-info" href="/urls/{{ url.url_id }}/analytics/view">View Analytics</a>
-  </div>
+  </section>
 
-  <h4>Recent Clicks</h4>
-  {% if analytics %}
-    <table class="table table-sm">
-      <thead><tr><th>Clicked At</th><th>User Agent</th><th>IP Address</th></tr></thead>
-      <tbody>
-        {% for c in analytics %}
-          <tr>
-            <td>{{ c.clicked_at }}</td>
-            <td>{{ c.user_agent }}</td>
-            <td>{{ c.ip_address }}</td>
-          </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  {% else %}
-    <p>No clicks recorded yet.</p>
-  {% endif %}
-
+  <section class="app-card">
+    <div class="mb-3">
+      <p class="app-eyebrow">Activity</p>
+      <h2 class="mb-0">Recent clicks</h2>
+    </div>
+    {% if analytics %}
+      <div class="table-responsive">
+        <table class="table table-hover">
+          <thead><tr><th>Clicked at</th><th>User agent</th><th>IP address</th></tr></thead>
+          <tbody>
+            {% for c in analytics %}
+            <tr>
+              <td>{{ c.clicked_at }}</td>
+              <td>{{ c.user_agent }}</td>
+              <td>{{ c.ip_address }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="app-empty-state mb-0">No clicks recorded for this link yet.</p>
+    {% endif %}
+  </section>
+</main>
 {% endblock %}

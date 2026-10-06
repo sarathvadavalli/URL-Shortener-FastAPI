@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <main class="auth-layout">
+        <section class="product-panel">
+            <span class="product-kicker">Simple links. Smarter insights.</span>
+            <h1>Make every link work harder.</h1>
+            <p class="product-intro">Sign in to manage your shortened URLs, keep track of click analytics and counts, and bring all your links together in one place.</p>
+            <div class="product-points">
+                <article class="product-point"><strong>Manage links</strong><span>Keep your shortened URLs organized and easy to find.</span></article>
+                <article class="product-point"><strong>Track clicks</strong><span>See how often your shared links are being opened.</span></article>
+                <article class="product-point"><strong>Share with ease</strong><span>Create clean, concise URLs in just a few seconds.</span></article>
+            </div>
+        </section>
+
+        <section class="auth-column">
+            <div class="auth-panel">
+                <h1>Welcome back</h1>
+                <p class="subtitle">Sign in or create an account to manage your links.</p>
+
+                <div class="tabs" role="tablist">
+                    <button class="tab active" type="button" id="loginTab">Login</button>
+                    <button class="tab" type="button" id="registerTab">Register</button>
+                </div>
+
+                <form id="authForm">
+                    <div id="nameGroup" class="hidden">
+                        <div>
+                            <label for="firstname">First Name</label>
+                            <input id="firstname" name="firstname" autocomplete="given-name">
+                        </div>
+                        <div>
+                            <label for="lastname">Last Name</label>
+                            <input id="lastname" name="lastname" autocomplete="family-name">
+                        </div>
+                    </div>
+
+                    <label id="usernameLabel" for="username">Username or Email</label>
+                    <input id="username" name="username" type="text" autocomplete="username" required>
+
+                    <div id="emailGroup" class="hidden">
+                        <label for="email">Email</label>
+                        <input id="email" name="email" type="email" autocomplete="email">
+                    </div>
+
+                    <label for="password">Password</label>
+                    <input id="password" name="password" type="password" autocomplete="current-password" required minlength="6">
+
+                    <button type="submit" id="submitButton">Login</button>
+                </form>
+
+                <div id="message" class="message"></div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        const authForm = document.getElementById("authForm");
+        const loginTab = document.getElementById("loginTab");
+        const registerTab = document.getElementById("registerTab");
+        const nameGroup = document.getElementById("nameGroup");
+        const firstNameInput = document.getElementById("firstname");
+        const lastNameInput = document.getElementById("lastname");
+        const usernameLabel = document.getElementById("usernameLabel");
+        const emailGroup = document.getElementById("emailGroup");
+        const emailInput = document.getElementById("email");
+        const passwordInput = document.getElementById("password");
+        const submitButton = document.getElementById("submitButton");
+        const message = document.getElementById("message");
+        const error = "{{ error }}";
+        let mode = "login";
+
+        if(error){
+            message.textContent = `Please login to continue.`;
+            message.className = "message error";
+        }
+
+        function setMode(nextMode) {
+            mode = nextMode;
+            const isRegister = mode === "register";
+            authForm.reset();
+
+            loginTab.classList.toggle("active", !isRegister);
+            registerTab.classList.toggle("active", isRegister);
+            nameGroup.classList.toggle("hidden", !isRegister);
+            firstNameInput.required = isRegister;
+            lastNameInput.required = isRegister;
+            usernameLabel.textContent = isRegister ? "UserName" :  "Username or Email";
+            emailGroup.classList.toggle("hidden", !isRegister);
+            emailInput.required = isRegister;
+            passwordInput.autocomplete = isRegister ? "new-password" : "current-password";
+            submitButton.textContent = isRegister ? "Create Account" : "Login";
+            message.className = "message";
+            message.textContent = "";
+        }
+
+        loginTab.addEventListener("click", () => setMode("login"));
+        registerTab.addEventListener("click", () => setMode("register"));
+
+        authForm.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            submitButton.disabled = true;
+            message.className = "message";
+
+            const payload = {
+                password: authForm.password.value
+            };
+
+            if (mode === "register") {
+                payload.first_name = authForm.firstname.value;
+                payload.last_name = authForm.lastname.value;
+                payload.username = authForm.username.value;
+                payload.email = authForm.email.value;
+            }
+            else {
+                payload.identifier = authForm.username.value;
+            }
+
+            try {
+                const response = await fetch(`/auth/${mode}`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+
+                if (mode === "register") {
+                    if (!response.ok) {
+                        let errorMessage = "Registration failed.";
+
+                        if (typeof data.detail === "string") {
+                            errorMessage = data.detail;
+                        } else if (Array.isArray(data.detail)) {
+                            errorMessage = data.detail
+                                .map(err => err.msg || JSON.stringify(err))
+                                .join(", ");
+                        } else if (typeof data.detail === "object" && data.detail !== null) {
+                            errorMessage = Object.entries(data.detail)
+                                .map(([key, val]) => `${key}: ${val}`)
+                                .join(", ");
+                        }
+
+                        throw new Error(errorMessage);
+                    }
+
+                    message.textContent = data.message || "Account created successfully.";
+                    message.className = "message success";
+
+                    setTimeout(() => setMode("login"), 3000);
+                    return;
+                }
+
+                // Login
+                if (!response.ok) {
+                    throw new Error(data.detail || "Authentication failed.");
+                }
+
+                message.textContent = `${data.message}. Attempting to open dashboard...`;
+                message.className = "message success";
+                window.location.replace('/home')
+
+            } catch (error) {
+                message.textContent = error.message;
+                message.className = "message error";
+            } finally {
+                submitButton.disabled = false;
+            }
+
+        });
+    </script>
+
+{% endblock %}

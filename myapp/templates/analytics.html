@@ -1,21 +1,35 @@
 {% extends "base.html" %}
 
 {% block content %}
-  <h2>Analytics</h2>
-  {% if analytics %}
-    <table class="table table-sm mt-3">
-      <thead><tr><th>Clicked At</th><th>User Agent</th><th>IP Address</th></tr></thead>
-      <tbody>
-        {% for c in analytics %}
-          <tr>
-            <td>{{ c.clicked_at }}</td>
-            <td>{{ c.user_agent }}</td>
-            <td>{{ c.ip_address }}</td>
-          </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  {% else %}
-    <p>No click analytics available.</p>
-  {% endif %}
+<main class="app-page">
+  <header class="app-page-header">
+    <div>
+      <p class="app-eyebrow">Performance</p>
+      <h1>Click analytics</h1>
+      <p>Review recent activity across your shortened link.</p>
+    </div>
+    <a class="btn btn-secondary" href="/urls">Back to URLs</a>
+  </header>
+
+  <section class="app-card">
+    {% if analytics %}
+      <div class="table-responsive">
+        <table class="table table-hover">
+          <thead><tr><th>Clicked at</th><th>User agent</th><th>IP address</th></tr></thead>
+          <tbody>
+            {% for c in analytics %}
+            <tr>
+              <td>{{ c.clicked_at }}</td>
+              <td>{{ c.user_agent }}</td>
+              <td>{{ c.ip_address }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="app-empty-state mb-0">No click analytics available yet.</p>
+    {% endif %}
+  </section>
+</main>
 {% endblock %}

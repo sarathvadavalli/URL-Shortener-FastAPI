@@ -1,22 +1,97 @@
 {% extends "base.html" %}
 
 {% block content %}
-  <h2>{% if action == 'create' %}Create URL{% else %}Edit URL{% endif %}</h2>
-  {% if error %}
-    <div class="alert alert-danger">{{ error }}</div>
-  {% endif %}
-  {% if short_code %}
-    <div class="alert alert-success">
-      Short URL created. Your short code is <strong>{{ short_code }}</strong>
-      (redirect link: <a href="/{{ short_code }}">/{{ short_code }}</a>).
-    </div>
-  {% endif %}
-  <form method="post" class="mt-3">
-    <div class="mb-3">
-      <label class="form-label">Original URL</label>
-      <input name="original_url" class="form-control" type="text" value="{{ url.original_url if url else original_url|default('') }}" required>
-    </div>
-    <button class="btn btn-primary" type="submit">{% if action == 'create' %}Create{% else %}Save{% endif %}</button>
-    <a class="btn btn-secondary" href="/">Cancel</a>
-  </form>
+<main class="url-landing-page">
+  <div class="url-landing-shell">
+    {% if short_code %}
+      <section class="url-result-card" id="urlResult" role="status" aria-live="polite">
+        <div class="url-result-icon" aria-hidden="true">✓</div>
+        <div class="url-result-copy">
+          <p class="url-eyebrow">Ready to share</p>
+          <h2>Your short link is ready</h2>
+          <div class="url-result-details">
+            <div>
+              <span class="url-detail-label">Long URL</span>
+              <a class="url-long-link" href="{{ original_url }}" target="_blank" rel="noopener noreferrer">{{ original_url }}</a>
+            </div>
+            <div>
+              <span class="url-detail-label">Short URL</span>
+              <span class="url-short-link">{{ request.base_url }}{{ short_code }}</span>
+            </div>
+            <div>
+              <span class="url-detail-label">Redirect link</span>
+              <a class="url-short-link" href="{{ request.base_url }}{{ short_code }}" target="_blank" rel="noopener noreferrer">Open shortened URL <span aria-hidden="true">↗</span></a>
+            </div>
+          </div>
+        </div>
+        <button class="url-result-dismiss" id="dismissUrlResult" type="button">OK</button>
+      </section>
+    {% endif %}
+
+    <section class="url-hero">
+      <div class="url-hero-copy">
+        <div class="url-brand-mark" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </div>
+        <p class="url-eyebrow">Simple links. Smarter insights.</p>
+        <h1>Make every link<br><span>work harder.</span></h1>
+        <p class="url-hero-description">
+          Turn long URLs into clean, shareable links in seconds. {% if is_authenticated %}You can now{% else %}Login to{% endif %} manage your shortened URLs, track click analytics, and keep an eye on your click counts.
+        </p>
+        {% if not is_authenticated %}
+        <a class="url-login-link" href="/auth/login">
+          Log in to manage your links <span aria-hidden="true">→</span>
+        </a>
+        {% endif %}
+        <div class="url-feature-list">
+          <div><span class="url-feature-check">✓</span> Clean, memorable links</div>
+          <div><span class="url-feature-check">✓</span> Click analytics in one place</div>
+        </div>
+      </div>
+
+      <div class="url-form-card">
+        <div class="url-form-heading">
+          <p class="url-eyebrow">Get started for free</p>
+          <h2>Shorten a URL</h2>
+          <p>Paste your long link below and we’ll make it easy to share.</p>
+        </div>
+
+        {% if error %}
+          <div class="alert alert-danger url-error" role="alert">{{ error }}</div>
+        {% endif %}
+
+        <form method="post" id="shortenUrlForm">
+          <label class="url-input-label" for="originalUrl">Your destination URL</label>
+          <div class="url-input-wrap">
+            <span class="url-input-icon" aria-hidden="true">↗</span>
+            <input
+              id="originalUrl"
+              name="original_url"
+              class="form-control url-input"
+              type="url"
+              placeholder="https://example.com/your-long-link"
+              value="{{ url.original_url if url else original_url|default('') }}"
+              required
+            >
+          </div>
+          <button class="btn url-submit-button" type="submit">
+            Shorten URL <span aria-hidden="true">→</span>
+          </button>
+          <p class="url-form-note">No account needed to create a link.</p>
+        </form>
+      </div>
+    </section>
+    <footer class="url-landing-footer">Fast, simple link sharing — with insights when you need them.</footer>
+  </div>
+</main>
+
+<script>
+  const dismissUrlResult = document.getElementById("dismissUrlResult");
+  dismissUrlResult?.addEventListener("click", () => {
+    document.getElementById("shortenUrlForm")?.reset();
+    const originalUrl = document.getElementById("originalUrl");
+    if (originalUrl) originalUrl.value = "";
+    document.getElementById("urlResult")?.remove();
+  });
+</script>
 {% endblock %}
