@@ -1,14 +1,17 @@
 from datetime import datetime, timezone
+from uuid import UUID, uuid4
+
 from fastapi import APIRouter, Request, Form, Depends, HTTPException, status
 from fastapi.responses import RedirectResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
+from redis.exceptions import RedisError
 
 from sqlalchemy.orm import Session
 from pydantic import ValidationError
 from starlette.concurrency import run_in_threadpool
 
 from myapp.core.security import get_current_user
-from myapp.database import get_db
+from myapp.database import get_db, redis_client
 from myapp.services.url_service import URLService
 from myapp.schemas.url_mapping import URLMappingCreate
 from myapp.models.url_mapping import URLMapping, Click
@@ -18,7 +21,6 @@ from myapp.tasks import record_click
 router = APIRouter()
 
 templates = Jinja2Templates(directory="myapp/templates")
-
 
 def render_template(
     name: str,
@@ -62,16 +64,19 @@ def create_form(request: Request, db: Session = Depends(get_db)):
                 "request": request, 
                 "action": "create", 
                 "is_authenticated": user is not None,
+                # "idempotency_key": str(uuid4()),
             }
         )
 
 
-@router.post("/urls/create", include_in_schema=False)
-def create_url(request: Request, original_url: str = Form(...), db: Session = Depends(get_db)):
+@router.post("/urls", include_in_schema=False)
+def create_url(request: Request, original_url: str = Form(...), idempotency_key: str = Form(...), db: Session = Depends(get_db)):
+    original_url = original_url.rstrip('/')
     form_context = {"request": request, "action": "create", "original_url": original_url}
 
     try:
         payload = URLMappingCreate(original_url=original_url)
+        idempotency_key = str(UUID(idempotency_key))
     except ValidationError as e:
         messages = [err.get("msg", "") for err in e.errors() if err.get("msg")]
         error = "; ".join(messages) if messages else str(e)
@@ -89,6 +94,14 @@ def create_url(request: Request, original_url: str = Form(...), db: Session = De
             user = get_current_user(token, db)
             user_id = user.id
 
+        idempotency_key = f"idempotency:url-create:{idempotency_key}"
+
+        if redis_client.get(idempotency_key) == 'success':
+            return RedirectResponse(
+                url="/urls/create",
+                status_code=status.HTTP_303_SEE_OTHER,
+            )
+
         service = URLService(db)
         mapping = service.create_url(
             payload=payload,
@@ -101,6 +114,8 @@ def create_url(request: Request, original_url: str = Form(...), db: Session = De
                 {**form_context, "error": "Failed to create short URL. Please try again."},
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+        redis_client.set(idempotency_key, "success", ex=300)
 
         return render_template("url_form.html", 
             {

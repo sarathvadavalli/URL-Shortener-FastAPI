@@ -12,7 +12,7 @@ class URLMappingCreate(BaseModel):
     @classmethod
     def validate_scheme(cls, value):
         try:
-            parsed = urlparse(str(value))
+            parsed = urlparse(str(value).rstrip('/'))
         except Exception:
             raise ValueError("Invalid URL structure")
 

@@ -53,14 +53,15 @@
         <div class="url-form-heading">
           <p class="url-eyebrow">Get started for free</p>
           <h2>Shorten a URL</h2>
-          <p>Paste your long link below and we’ll make it easy to share.</p>
+          <p>Paste your long link below and we'll make it easy to share.</p>
         </div>
 
         {% if error %}
           <div class="alert alert-danger url-error" role="alert">{{ error }}</div>
         {% endif %}
 
-        <form method="post" id="shortenUrlForm">
+        <form method="post" action="/urls" id="shortenUrlForm">
+          <input type="hidden" id="idempotencyKey" name="idempotency_key" value="{{ idempotency_key }}">
           <label class="url-input-label" for="originalUrl">Your destination URL</label>
           <div class="url-input-wrap">
             <span class="url-input-icon" aria-hidden="true">↗</span>
@@ -86,12 +87,18 @@
 </main>
 
 <script>
-  const dismissUrlResult = document.getElementById("dismissUrlResult");
-  dismissUrlResult?.addEventListener("click", () => {
-    document.getElementById("shortenUrlForm")?.reset();
-    const originalUrl = document.getElementById("originalUrl");
-    if (originalUrl) originalUrl.value = "";
-    document.getElementById("urlResult")?.remove();
-  });
+    const idempotencyInput = document.getElementById("idempotencyKey");
+    if (idempotencyInput && !idempotencyInput.value) {
+      idempotencyInput.value = crypto.randomUUID();
+    }
+
+    const dismissUrlResult = document.getElementById("dismissUrlResult");
+    dismissUrlResult?.addEventListener("click", () => {
+      document.getElementById("shortenUrlForm")?.reset();
+      const originalUrl = document.getElementById("originalUrl");
+      if (originalUrl) originalUrl.value = "";
+      document.getElementById("urlResult")?.remove();
+    });
 </script>
+
 {% endblock %}
