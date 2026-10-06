@@ -17,6 +17,7 @@ ENV/
 # Env files
 .env
 .env.*
+!.env.example
 
 # Database files
 *.db
