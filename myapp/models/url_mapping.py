@@ -12,8 +12,10 @@ class URLMapping(Base):
     # BigInteger because it has to store ids of more than 32-bits (~50-bits)
     url_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
-    original_url: Mapped[str] = mapped_column(String, nullable=False)
-    short_code: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    original_url: Mapped[str] = mapped_column(String(2048), nullable=False)
+    
+    # Estimated length: log (base 64) 2^50 = 50/6 ~ 9 characters
+    short_code: Mapped[str] = mapped_column(String(10), nullable=False, unique=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     click_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 

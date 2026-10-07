@@ -1,7 +1,7 @@
 from datetime import datetime
 from fastapi import FastAPI, Request, HTTPException, status
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, JSONResponse
 from starlette.middleware.sessions import SessionMiddleware
 
 from myapp.core.config import settings
@@ -66,10 +66,12 @@ def seed_url_mappings():
         if db.query(URLMapping).count() == 0:
             initial_url_mappings = [
                 URLMapping(
+                    user_id=0,
                     original_url="https://fastapi.tiangolo.com/",
                     short_code="fastapi",
                 ),
                 URLMapping(
+                    user_id=0,
                     original_url="https://docs.python.org/3/",
                     short_code="python",
                 ),
