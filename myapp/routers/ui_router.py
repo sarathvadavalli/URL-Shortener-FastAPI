@@ -1,10 +1,10 @@
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Request, Form, Depends, HTTPException, status
+from fastapi import APIRouter, Request, Form, Depends
+from fastapi import HTTPException, status, BackgroundTasks
 from fastapi.responses import RedirectResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
-from redis.exceptions import RedisError
 
 from sqlalchemy.orm import Session
 from pydantic import ValidationError
@@ -171,7 +171,9 @@ def view_analytics(request: Request, id: int, db: Session = Depends(get_db), use
 
 
 @router.get("/{short_code}")
-async def redirect(short_code: str, request: Request, db: Session = Depends(get_db)):
+async def redirect(request: Request, short_code: str, 
+    background_tasks: BackgroundTasks, db: Session = Depends(get_db)
+):
     url_service = URLService(db)
 
     # Redis → DB fallback
@@ -191,11 +193,20 @@ async def redirect(short_code: str, request: Request, db: Session = Depends(get_
     clicked_at = datetime.now(timezone.utc)
 
     # Send analytics event to Celery
-    record_click.delay(
+    # record_click.delay(
+    #     data["url_mapping_id"],
+    #     ip_address,
+    #     user_agent,
+    #     clicked_at,
+    # )
+
+    # Send analytics event as background task to FastAPI
+    background_tasks.add_task(
+        record_click, 
         data["url_mapping_id"],
         ip_address,
         user_agent,
-        clicked_at,
+        clicked_at
     )
 
     # Redirects to the original URL
