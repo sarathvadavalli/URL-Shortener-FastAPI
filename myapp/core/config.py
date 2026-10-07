@@ -6,7 +6,8 @@ load_dotenv()
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "URL SHORTENER"
-    DATABASE_URL: str
+    DATABASE_URL: str = os.getenv("DATABASE_URL")
+    REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379/1")
 
     jwt_algorithm: str = os.getenv("JWT_ALGORITHM", "HS256")
     jwt_access_token_expire_minutes: int = int(
