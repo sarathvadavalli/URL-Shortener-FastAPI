@@ -1,5 +1,5 @@
-import uvicorn
+# import uvicorn
 
-if __name__ == "__main__":
-    print("The server is listening on http://127.0.0.1:8000")
-    uvicorn.run("myapp.main:app", host="127.0.0.1", port=8000)
+# if __name__ == "__main__":
+#     print("The server is starting on http://127.0.0.1:8000")
+#     uvicorn.run("myapp.main:app", host="127.0.0.1", port=8000)

@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: url-shortener-fastapi
+    env: python
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "uvicorn myapp.main:app --host 0.0.0.0 --port $PORT"
+    plan: free
+    envVars:
+      # Public variables
+      - key: ENVIRONMENT
+        value: production
+      
+      # Secret variables
+      - key: REDIS_URL
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET_KEY
+        sync: false
+      - key: SESSION_SECRET_KEY
+        sync: false
