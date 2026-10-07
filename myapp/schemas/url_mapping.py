@@ -3,7 +3,7 @@ from typing import Optional
 from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field, field_validator
 from urllib.parse import urlparse
 
-SHORTENER_DOMAIN = "localhost:8000"
+SHORTENER_DOMAIN = "url-shortener-fastapi-rato.onrender.com"
 
 class URLMappingCreate(BaseModel):
     original_url: AnyHttpUrl = Field(...,  min_length=10, max_length=2048)
