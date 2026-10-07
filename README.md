@@ -13,7 +13,7 @@ URL shortener is a project built with FastAPI, SQLAlchemy and Redis, with Celery
 ## Tech Stack
 
 - **Frontend**: HTML, CSS, Javascript
-- **Backend**: FastAPI, JWT Authentication, Pydantic, SQLALchemy ORM, Redis, Celery
+- **Backend**: FastAPI, JWT Authentication, Pydantic, SQLALchemy ORM, Redis
 - **Database**: MySQL
 
 ## Architecture
@@ -29,7 +29,7 @@ URL shortener is a project built with FastAPI, SQLAlchemy and Redis, with Celery
 - **Database Integrity** — Ensures database integrity by adding unique constraint for (user_id, original_url) combination to ensure no duplicate urls are stored corresponding to a user, handling concurrency.
 - **Idempotency** — Redis-based idempotency keys with TTL to prevent processing duplicate short url creation requests.
 - **Caching** — Redis-based caching for fetching original url corresponding to a short url with minimum latency.
-- **Celery** — Handles background processing like creating click records and incrementing count with redis as message broker.
+- **Background processing** — Handles background tasks like creating click records and incrementing count with FastAPI BackgroundTasks class. (Can move to celery for heavy processing)
 - **Asynchronous task execution** — Executes the redirect requests asynchronously to avoid blocking the event loop.
 
 
@@ -63,12 +63,6 @@ Verify the Redis connection:
 
 ```bash
    redis-cli ping  # Expected output: PONG
-```
-
-5. Start the celery worker.
-   
-```bash
-celery -A myapp/tasks worker --loglevel=INFO --pool=solo
 ```
 
 6. Open the UI at:
