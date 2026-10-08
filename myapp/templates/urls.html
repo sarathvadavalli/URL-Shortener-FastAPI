@@ -1,6 +1,31 @@
 {% extends "base.html" %}
 
 {% block content %}
+{% macro render_url_table(url_list) %}
+  <div class="table-responsive">
+    <table class="table table-hover">
+      <thead>
+        <tr><th>ID</th><th>Short code</th><th>Original URL</th><th>Created</th><th>Click Count</th><th>Actions</th></tr>
+      </thead>
+      <tbody>
+        {% for u in url_list %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td><span class="app-code">{{ u.short_code }}</span></td>
+          <td class="app-truncate">{{ u.original_url }}</td>
+          <td>{{ u.created_at }}</td>
+          <td>{{ u.click_count }}</td>
+          <td class="app-actions">
+            <a class="btn btn-sm btn-outline-primary" href="/urls/{{ u.url_id }}">View</a>
+            <a class="btn btn-sm btn-outline-secondary" href="/urls/{{ u.url_id }}/analytics/view">Analytics</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endmacro %}
+
 <main class="app-page">
   <header class="app-page-header">
     <div>
@@ -12,35 +37,68 @@
   </header>
 
   <section class="app-card">
-    {% if urls %}
-      <div class="table-responsive">
-        <table class="table table-hover">
-          <thead>
-            <tr><th>ID</th><th>Short code</th><th>Original URL</th><th>Created</th><th>Click Count</th><th>Actions</th></tr>
-          </thead>
-          <tbody>
-            {% for u in urls %}
-            <tr>
-              <td>{{ loop.index }}</td>
-              <td><span class="app-code">{{ u.short_code }}</span></td>
-              <td class="app-truncate">{{ u.original_url }}</td>
-              <td>{{ u.created_at }}</td>
-              <td>{{ u.click_count }}</td>
-              <td class="app-actions">
-                <a class="btn btn-sm btn-outline-primary" href="/urls/{{ u.url_id }}">View</a>
-                <form class="d-inline" method="delete" action="/urls/{{ u.url_id }}">
-                  <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
-                </form>
-                <a class="btn btn-sm btn-outline-info" href="/urls/{{ u.url_id }}/analytics/view">Analytics</a>
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    {% else %}
-      <p class="app-empty-state mb-0">No URLs yet. Create your first short link to get started.</p>
-    {% endif %}
+    <div class="nav nav-tabs mb-3" role="tablist" aria-label="URL status">
+      <button class="nav-link active" id="active-tab" type="button" role="tab"
+              aria-selected="true" aria-controls="active-panel" tabindex="0">
+        Active <span class="badge text-bg-light">{{ active_urls | length }}</span>
+      </button>
+      <button class="nav-link" id="inactive-tab" type="button" role="tab"
+              aria-selected="false" aria-controls="inactive-panel" tabindex="-1">
+        Inactive <span class="badge text-bg-light">{{ inactive_urls | length }}</span>
+      </button>
+    </div>
+
+    <div id="active-panel" role="tabpanel" aria-labelledby="active-tab" tabindex="0">
+      {% if active_urls %}
+        {{ render_url_table(active_urls) }}
+      {% else %}
+        <p class="app-empty-state mb-0">
+          No active URLs yet. <a href="/urls/create">Create your first short link</a> to get started.
+        </p>
+      {% endif %}
+    </div>
+
+    <div id="inactive-panel" role="tabpanel" aria-labelledby="inactive-tab" tabindex="0" hidden>
+      {% if inactive_urls %}
+        {{ render_url_table(inactive_urls) }}
+      {% else %}
+        <p class="app-empty-state mb-0">No inactive URLs.</p>
+      {% endif %}
+    </div>
   </section>
 </main>
+
+<script>
+  (() => {
+    const tabs = [...document.querySelectorAll('[role="tab"]')];
+    const panels = tabs.map((tab) => document.getElementById(tab.getAttribute("aria-controls")));
+
+    function activateTab(selectedTab, moveFocus = false) {
+      tabs.forEach((tab, index) => {
+        const selected = tab === selectedTab;
+        tab.classList.toggle("active", selected);
+        tab.setAttribute("aria-selected", String(selected));
+        tab.tabIndex = selected ? 0 : -1;
+        panels[index].hidden = !selected;
+      });
+
+      if (moveFocus) selectedTab.focus();
+    }
+
+    tabs.forEach((tab, index) => {
+      tab.addEventListener("click", () => activateTab(tab));
+      tab.addEventListener("keydown", (event) => {
+        let nextIndex;
+        if (event.key === "ArrowRight") nextIndex = (index + 1) % tabs.length;
+        else if (event.key === "ArrowLeft") nextIndex = (index - 1 + tabs.length) % tabs.length;
+        else if (event.key === "Home") nextIndex = 0;
+        else if (event.key === "End") nextIndex = tabs.length - 1;
+        else return;
+
+        event.preventDefault();
+        activateTab(tabs[nextIndex], true);
+      });
+    });
+  })();
+</script>
 {% endblock %}

@@ -37,14 +37,28 @@ def home(request: Request, db: Session = Depends(get_db), user: Users=Depends(ge
     total_clicks = db.query(Click).count()
     service = URLService(db)
     recent = service.list_urls(user)[:10]
-    return render_template("index.html", {"request": request, "is_authenticated": True,  "total_urls": total_urls, "total_clicks": total_clicks, "recent": recent})
+    return render_template("home.html", {"request": request, "is_authenticated": True,  "total_urls": total_urls, "total_clicks": total_clicks, "recent": recent})
 
 
 @router.get("/urls", include_in_schema=False)
-def list_urls(request: Request, db: Session = Depends(get_db), user: Users=Depends(get_current_user)):
+def list_urls(request: Request, db: Session = Depends(get_db), user: Users = Depends(get_current_user)):
     service = URLService(db)
     urls = service.list_urls(user)
-    return render_template("urls.html", {"request": request, "is_authenticated": True, "urls": urls})
+
+    active_urls = [url for url in urls if url.is_active]
+    inactive_urls = [url for url in urls if not url.is_active]
+
+    return render_template(
+        "urls.html",
+        {
+            "request": request,
+            "is_authenticated": True,
+            "active_urls": active_urls,
+            "inactive_urls": inactive_urls,
+            "active_count": len(active_urls),
+            "inactive_count": len(inactive_urls),
+        }
+    )
 
 
 @router.get("/urls/create", include_in_schema=False)
@@ -137,27 +151,43 @@ def create_url(request: Request, original_url: str = Form(...), idempotency_key:
 
 
 @router.get("/urls/{id}", include_in_schema=False)
-def url_detail(request: Request, id: int, db: Session = Depends(get_db), user: Users=Depends(get_current_user)):
+def url_detail(request: Request, id: int,
+    db: Session = Depends(get_db), user: Users=Depends(get_current_user)
+):
     service = URLService(db)
     mapping = service.get_url(id, user)
     if mapping is None:
         raise HTTPException(status_code=404, detail="URL mapping not found")
 
-    # if mapping == 'FORBIDDEN':
-    #     raise HTTPException(status_code=403, detail="You do not have permission to access this URL")
-
     analytics = service.get_analytics(id) or []
-    return render_template("url_detail.html", {"request": request, "is_authenticated": True, "url": mapping, "analytics": analytics})
+
+    message = request.session.pop('message', None)
+
+    return render_template("url_detail.html", 
+        {"request": request, "is_authenticated": True, "message": message,
+        "url": mapping, "analytics": analytics})
 
 
-@router.delete("/urls/{id}", include_in_schema=False)
-def delete_url(id: int, db: Session = Depends(get_db), user: Users=Depends(get_current_user)):
+@router.post("/urls/{id}/activate", include_in_schema=False)
+def activate_url(request: Request, id: int, db: Session = Depends(get_db), user: Users=Depends(get_current_user)):
     service = URLService(db)
-    deleted = service.delete_url(id, user)
-    if not deleted:
-        raise HTTPException(status_code=404, detail="Could not delete the URL")
+    activated = service.activate_url(id, user)
+    if not activated:
+        raise HTTPException(status_code=404, detail="Could not activate the URL")
 
-    return RedirectResponse(url="/urls", status_code=status.HTTP_303_SEE_OTHER)
+    request.session['message'] = "activated"
+    return RedirectResponse(url=f"/urls/{id}", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/urls/{id}/deactivate", include_in_schema=False)
+def deactivate_url(request: Request, id: int, db: Session = Depends(get_db), user: Users=Depends(get_current_user)):
+    service = URLService(db)
+    deactivated = service.deactivate_url(id, user)
+    if not deactivated:
+        raise HTTPException(status_code=404, detail="Could not deactivate the URL")
+
+    request.session['message'] = "deactivated"
+    return RedirectResponse(url=f"/urls/{id}", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.get("/urls/{id}/analytics/view", include_in_schema=False)
@@ -176,16 +206,16 @@ async def redirect(request: Request, short_code: str,
 ):
     url_service = URLService(db)
 
-    # Redis → DB fallback
+    # Calling the service using a worker thread to prevent blocking event loop
     data = await run_in_threadpool(
         url_service.get_original_by_short_code,
-        short_code,
+        short_code
     )
 
-    if data is None:
+    if not data or data == "Not active":
         raise HTTPException(
             status_code=404,
-            detail="Short code not found",
+            detail="The page you are looking for doesnot exist",
         )
 
     user_agent = request.headers.get("user-agent")

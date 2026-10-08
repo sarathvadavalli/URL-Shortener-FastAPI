@@ -58,11 +58,17 @@ class URLService:
     def get_url(self, url_id: int, user: Users):
         return self.repository.get_by_id(url_id, user)
 
-    def delete_url(self, url_id: int, user: Users) -> bool:
-        deleted = self.repository.delete(url_id, user)
-        if deleted == 0:
+    def activate_url(self, url_id: int, user: Users) -> bool:
+        return self.repository.activate(url_id, user)
+
+    def deactivate_url(self, url_id: int, user: Users) -> bool:
+        short_code = self.repository.deactivate(url_id, user)
+        if not short_code:
             return False
 
+        cache_key = f"url:{short_code}"
+        cached = redis_client.delete(cache_key)
+        
         return True
 
     def get_analytics(self, url_id: int) -> Optional[list[Click]]:
@@ -83,6 +89,9 @@ class URLService:
 
         if mapping is None:
             return None
+
+        if not mapping.is_active:
+            return "Not active"
 
         data = {
             "url_mapping_id": mapping.url_id,

@@ -53,15 +53,32 @@ class URLRepository:
 
     def get_by_id(self, url_id: int, user: Users) -> Optional[URLMapping]:
         return self.db.query(URLMapping).filter(URLMapping.url_id == url_id, URLMapping.user_id == user.id).first()
-        
 
-    def delete(self, url_id: int, user: Users) -> Optional[URLMapping]:
-        return (
-            db.query(URLMapping).filter(
+    
+    def activate(self, url_id: int, user: Users) -> int:
+        count = self.db.query(URLMapping).filter(
                 (URLMapping.url_id == url_id) &
                 (URLMapping.user_id == user.id)
-            ).delete(synchronize_session=False)
-        )
+            ).update({"is_active": True})
+
+        self.db.commit()
+
+        return count
+        
+
+    def deactivate(self, url_id: int, user: Users) -> str:
+        mapping =  self.db.query(URLMapping).filter(
+                (URLMapping.url_id == url_id) &
+                (URLMapping.user_id == user.id)
+            ).first()
+        
+        if not mapping:
+            return None
+        
+        mapping.is_active = False
+        self.db.commit()
+
+        return mapping.short_code
 
 
     def get_analytics(self, url_id: int) -> Optional[list[Click]]:

@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, BigInteger, String
+from sqlalchemy import DateTime, ForeignKey, Integer, BigInteger, String, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from myapp.database import Base
@@ -18,6 +18,7 @@ class URLMapping(Base):
     short_code: Mapped[str] = mapped_column(String(10), nullable=False, unique=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     click_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     clicks: Mapped[list["Click"]] = relationship(
         back_populates="url_mapping",
