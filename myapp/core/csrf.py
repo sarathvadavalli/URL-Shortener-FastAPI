@@ -31,3 +31,4 @@ async def require_csrf(request: Request):
         or not hmac.compare_digest(expected.encode(), supplied.encode())
     ):
         raise HTTPException(403, "Invalid CSRF token; reload the form and try again")
+        
