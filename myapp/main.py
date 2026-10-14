@@ -44,6 +44,7 @@ async def custom_http_exception_handler(request: Request, exc: HTTPException):
         if "text/html" in accept_header:
             response = RedirectResponse(url="/auth/login", status_code=status.HTTP_303_SEE_OTHER)
             response.delete_cookie(key="access_token")
+            response.set_cookie(key="flash_error", value="Your session has expired. Please login again", httponly=True)
             return response
 
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
