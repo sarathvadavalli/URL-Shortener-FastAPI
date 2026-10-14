@@ -1,6 +1,7 @@
-from datetime import datetime, timezone
-from fastapi import BackgroundTasks
+import logging
+from datetime import datetime
 
+from myapp.core.time import to_utc_naive
 from myapp.database import SessionLocal
 from myapp.models.url_mapping import Click, URLMapping
 
@@ -8,6 +9,11 @@ from myapp.models.url_mapping import Click, URLMapping
 def record_click(url_mapping_id: int, ip_address: str | None, 
     user_agent: str | None, clicked_at: datetime
 ):
+    clicked_at = to_utc_naive(clicked_at)
+
+    user_agent = user_agent[:255] if user_agent is not None else None
+    ip_address = ip_address[:45] if ip_address is not None else None
+
     db = SessionLocal()
     try:
         click = Click(
@@ -27,6 +33,9 @@ def record_click(url_mapping_id: int, ip_address: str | None,
 
     except Exception:
         db.rollback()
+        logging.getLogger(__name__).exception(
+            "Click persistence failed for mapping %s", url_mapping_id
+        )
         raise
 
     finally:

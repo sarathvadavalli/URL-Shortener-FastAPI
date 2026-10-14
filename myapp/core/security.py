@@ -1,12 +1,13 @@
 import base64, hashlib, hmac
 import os, json
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from typing import Any
 
 from fastapi import Cookie, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from myapp.core.config import settings as app_settings
+from myapp.core.time import utc_now
 from myapp.database import get_db
 from myapp.models.user_model import Users
 
@@ -32,11 +33,14 @@ def verify_password(password: str, password_hash: str) -> bool:
         if algorithm != "pbkdf2_sha256":
             return False
 
+        if iterations != "100000":
+            return False
+
         digest = hashlib.pbkdf2_hmac(
             "sha256",
             password.encode("utf-8"),
             base64.b64decode(salt),
-            int(iterations),
+            100_000,
         )
         return hmac.compare_digest(
             base64.b64encode(digest).decode(),
@@ -56,7 +60,7 @@ def _base64url_decode(value: str) -> bytes:
 
 
 def create_access_token(subject: str) -> str:
-    expires_at = datetime.now(timezone.utc) + timedelta(
+    expires_at = utc_now() + timedelta(
         minutes=app_settings.jwt_access_token_expire_minutes
     )
     header = {"alg": app_settings.jwt_algorithm, "typ": "JWT"}
@@ -97,7 +101,7 @@ def decode_access_token(token: str) -> dict[str, Any]:
 
         payload = json.loads(_base64url_decode(encoded_payload))
         expires_at = payload.get("exp")
-        now = int(datetime.now(timezone.utc).timestamp())
+        now = int(utc_now().timestamp())
         if not isinstance(expires_at, int) or expires_at < now:
             raise ValueError("Token expired.")
 

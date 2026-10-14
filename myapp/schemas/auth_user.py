@@ -53,7 +53,7 @@ class UserCreate(BaseModel):
                 "Username must start and end with a letter or digit"
             )
 
-        if not all(c.isalnum() for c in value):
+        if not all(c.isalnum() or c in "_-" for c in value):
             raise ValueError(
                 "Username can contain only letters, digits, '_' and '-'"
             )

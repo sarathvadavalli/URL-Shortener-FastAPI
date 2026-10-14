@@ -3,6 +3,7 @@ from datetime import datetime
 from sqlalchemy import DateTime, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
+from myapp.core.time import utc_now_naive
 from myapp.database import Base
 
 
@@ -15,7 +16,7 @@ class Users(Base):
     user_name: Mapped[str] = mapped_column(String(20), nullable=False, unique=True)
     email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     password: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now_naive, nullable=False)
     last_login_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
 
     def __str__(self) -> str:

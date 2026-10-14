@@ -1,6 +1,7 @@
 from typing import Optional
 
 from fastapi import HTTPException
+from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
@@ -47,6 +48,18 @@ class URLRepository:
             ).first()
 
 
+    def get_summary(self, user: Users):
+        stmt = (
+            select(
+                func.count(URLMapping.url_id).label("total_urls"),
+                func.sum(URLMapping.click_count).label("total_clicks")
+            )
+            .where(URLMapping.user_id == user.id)
+        )
+
+        return self.db.execute(stmt).first()
+
+
     def list_all(self, user: Users) -> list[URLMapping]:
         return self.db.query(URLMapping).filter(URLMapping.user_id == user.id).order_by(URLMapping.url_id.desc()).all()
 
@@ -81,8 +94,21 @@ class URLRepository:
         return mapping.short_code
 
 
-    def get_analytics(self, url_id: int) -> Optional[list[Click]]:
-        return self.db.query(Click).filter(Click.url_mapping_id == url_id).order_by(Click.clicked_at.desc()).all()
+    def get_analytics(self, url_id: int, user: Users, limit: int=None) -> Optional[list[Click]]:
+        query = (
+            self.db.query(Click)
+            .join(URLMapping, Click.url_mapping_id == URLMapping.url_id)
+            .filter(
+                URLMapping.url_id == url_id,
+                URLMapping.user_id == user.id,
+            )
+            .order_by(Click.clicked_at.desc())
+        )
+
+        if limit is not None:
+            query = query.limit(limit)
+
+        return query.all()
 
 
     def get_by_short_code(self, short_code: str) -> str:

@@ -1,5 +1,4 @@
-import json
-from datetime import datetime
+import json, logging
 from typing import Optional
 from sqlalchemy.orm import Session
 
@@ -10,6 +9,7 @@ from myapp.schemas.url_mapping import URLMappingCreate
 from myapp.repos.url_repository import URLRepository
 from myapp.services.id_generator import IDGenerator
 
+logger = logging.getLogger(__name__)
 
 class URLService:
     def __init__(self, db: Session):
@@ -35,8 +35,8 @@ class URLService:
 
     # Using Base-62 encoding of url_id for shortcode generation
     # Because it is space efficient and also guarantees uniqueness
-    def _generate_short_code(self, url_id: int) -> str:
-        value = url_id
+    @staticmethod
+    def _generate_short_code(value: int) -> str:
         if value < 0:
             raise ValueError("value must be non-negative")
 
@@ -51,6 +51,9 @@ class URLService:
 
         return "".join(reversed(encoded))
 
+
+    def get_summary(self, user: Users):
+        return self.repository.get_summary(user)
 
     def list_urls(self, user: Users) -> list[URLMapping]:
         return self.repository.list_all(user)
@@ -67,42 +70,53 @@ class URLService:
             return False
 
         cache_key = f"url:{short_code}"
-        cached = redis_client.delete(cache_key)
+        try:
+            cached = redis_client.delete(cache_key)
+        except RedisError:
+            logger.warning(
+                "Redis cache deletion failed. Database status remains authoritative"
+            )
         
         return True
 
-    def get_analytics(self, url_id: int) -> Optional[list[Click]]:
-        return self.repository.get_analytics(url_id)
+    def get_recent_analytics(self, url_id: int, user: Users) -> Optional[list[Click]]:
+        return self.repository.get_analytics(url_id, user, 3)
+
+    def get_analytics(self, url_id: int, user: Users) -> Optional[list[Click]]:
+        return self.repository.get_analytics(url_id, user)
 
 
     def get_original_by_short_code(self, short_code: str):
         cache_key = f"url:{short_code}"
 
-        # Check Redis if shortcode already exists
-        cached = redis_client.get(cache_key)
+        try:
+            # Check Redis if shortcode already exists
+            cached = redis_client.get(cache_key)
 
-        if cached:
-            return json.loads(cached)
+            if cached:
+                return json.loads(cached)
 
-        # If cache miss → fetch from DB
-        mapping = self.repository.get_by_short_code(short_code)
+            # If cache miss → fetch from DB
+            mapping = self.repository.get_by_short_code(short_code)
 
-        if mapping is None:
-            return None
+            if mapping is None:
+                return None
 
-        if not mapping.is_active:
-            return "Not active"
+            if not mapping.is_active:
+                return "Not active"
 
-        data = {
-            "url_mapping_id": mapping.url_id,
-            "original_url": str(mapping.original_url),
-        }
+            data = {
+                "url_mapping_id": mapping.url_id,
+                "original_url": str(mapping.original_url),
+            }
 
-        # 3. Store in Redis
-        redis_client.set(
-            cache_key,
-            json.dumps(data),
-            ex=3600,
-        )
+            # 3. Store in Redis
+            redis_client.set(
+                cache_key,
+                json.dumps(data),
+                ex=3600,
+            )
+            return data
 
-        return data
+        except RedisError:
+            logger.warning("Redis unavailable. Resolving redirect from database")

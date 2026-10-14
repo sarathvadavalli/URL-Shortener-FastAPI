@@ -1,11 +1,12 @@
 fastapi
 uvicorn
 SQLAlchemy
-PyMySQL
+PyMySQL[rsa]
 redis
 pydantic-settings
 python-dotenv
 Jinja2
 python-multipart
 email-validator
-itsdangerous
+dnspython
+alembic>=1.13,<2

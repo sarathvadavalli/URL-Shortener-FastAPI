@@ -1,4 +1,3 @@
-from datetime import datetime
 from pydantic import EmailStr, TypeAdapter
 from dns import exception, resolver
 
@@ -9,7 +8,9 @@ from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from myapp.core.time import utc_now_naive
 from myapp.core.security import create_access_token, hash_password, verify_password
+from myapp.core.csrf import csrf_token, rotate_csrf
 from myapp.database import SessionLocal, get_db, init_db
 from myapp.models.user_model import Users
 from myapp.schemas.auth_user import MessageResponse, UserCreate, UserLogin
@@ -41,10 +42,11 @@ def domain_has_mx_record(email: str) -> bool | None:
 @router.get("/login")
 def login_page(request: Request):
     error = request.cookies.get("flash_error", "")
+
     response = templates.TemplateResponse(
         request, 
         "login.html", 
-        context={"error": error}
+        context={"error": error, "csrf_token": csrf_token(request)},
     )
     if error != "":
         response.delete_cookie("flash_error")
@@ -108,7 +110,7 @@ def register_user(payload: UserCreate):
 
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"This username or email already exists.",
+            detail="This username or email already exists.",
         ) from exc
     finally:
         db.close()
@@ -119,6 +121,7 @@ def register_user(payload: UserCreate):
 @router.post("/login", response_model=MessageResponse)
 def login_user(
     payload: UserLogin,
+    request: Request,
     response: Response,
     db: Session = Depends(get_db),
 ):
@@ -142,8 +145,10 @@ def login_user(
             detail="Invalid credentials",
         )
 
-    user.last_login_at = datetime.utcnow()
+    user.last_login_at = utc_now_naive()
     db.commit()
+
+    rotate_csrf(request)
 
     token = create_access_token(user.user_name)
     response.set_cookie(
@@ -159,12 +164,14 @@ def login_user(
 
 
 @router.post("/logout", response_model=MessageResponse)
-def logout(response: Response):
+def logout(request: Request, response: Response):
+    request.session.clear()
     response.delete_cookie(
         key="access_token",
         httponly=True,
         secure=True,
         samesite="lax",
     )
+    response.delete_cookie(key="session")
 
     return {"message": "Logged out successfully"}

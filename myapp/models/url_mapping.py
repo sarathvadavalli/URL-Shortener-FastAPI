@@ -3,6 +3,7 @@ from datetime import datetime
 from sqlalchemy import DateTime, ForeignKey, Integer, BigInteger, String, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from myapp.core.time import utc_now_naive
 from myapp.database import Base
 
 
@@ -16,7 +17,7 @@ class URLMapping(Base):
     original_url: Mapped[str] = mapped_column(String(2048), nullable=False)
     # Estimated max_length: log (base 64) 2^50 = 50/6 ~ 9 characters
     short_code: Mapped[str] = mapped_column(String(10), nullable=False, unique=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now_naive, nullable=False)
     click_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
@@ -34,7 +35,7 @@ class Click(Base):
 
     click_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     url_mapping_id: Mapped[int] = mapped_column(ForeignKey("url_mappings.url_id"), nullable=False)
-    clicked_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    clicked_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now_naive, nullable=False)
     user_agent: Mapped[str | None] = mapped_column(String(255), nullable=True)
     ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
 

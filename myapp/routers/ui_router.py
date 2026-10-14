@@ -1,4 +1,3 @@
-from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Request, Form, Depends
@@ -10,6 +9,8 @@ from sqlalchemy.orm import Session
 from pydantic import ValidationError
 from starlette.concurrency import run_in_threadpool
 
+from myapp.core.csrf import csrf_token
+from myapp.core.time import utc_now
 from myapp.core.security import get_current_user
 from myapp.database import get_db, redis_client
 from myapp.services.url_service import URLService
@@ -27,16 +28,23 @@ def render_template(
     context: dict,
     status_code: int = status.HTTP_200_OK,
 ) -> HTMLResponse:
+    request = context.get("request")
+    if isinstance(request, Request):
+        context = {**context, "csrf_token": csrf_token(request)}
+
     tpl = templates.env.get_template(name)
     return HTMLResponse(tpl.render(**context), status_code=status_code)
 
 
 @router.get("/home", include_in_schema=False)
 def home(request: Request, db: Session = Depends(get_db), user: Users=Depends(get_current_user)):
-    total_urls = db.query(URLMapping).count()
-    total_clicks = db.query(Click).count()
     service = URLService(db)
-    recent = service.list_urls(user)[:10]
+   
+    values = service.get_summary(user)
+    total_urls = 0 if values[0] is None else values[0]
+    total_clicks = 0 if values[1] is None else values[1]
+
+    recent = service.list_urls(user)[:5]
     return render_template("home.html", {"request": request, "is_authenticated": True,  "total_urls": total_urls, "total_clicks": total_clicks, "recent": recent})
 
 
@@ -159,7 +167,7 @@ def url_detail(request: Request, id: int,
     if mapping is None:
         raise HTTPException(status_code=404, detail="URL mapping not found")
 
-    analytics = service.get_analytics(id) or []
+    analytics = service.get_recent_analytics(id, user) or []
 
     message = request.session.pop('message', None)
 
@@ -193,7 +201,7 @@ def deactivate_url(request: Request, id: int, db: Session = Depends(get_db), use
 @router.get("/urls/{id}/analytics/view", include_in_schema=False)
 def view_analytics(request: Request, id: int, db: Session = Depends(get_db), user: Users=Depends(get_current_user)):
     service = URLService(db)
-    analytics = service.get_analytics(id)
+    analytics = service.get_analytics(id, user)
     if analytics is None:
         return RedirectResponse(url="/urls", status_code=status.HTTP_303_SEE_OTHER)
 
@@ -220,7 +228,7 @@ async def redirect(request: Request, short_code: str,
 
     user_agent = request.headers.get("user-agent")
     ip_address = request.client.host if request.client else None
-    clicked_at = datetime.now(timezone.utc)
+    clicked_at = utc_now()
 
     # Send analytics event to Celery
     # record_click.delay(

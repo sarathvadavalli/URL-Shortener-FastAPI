@@ -34,7 +34,10 @@
         if (logoutButton) {
             logoutButton.addEventListener("click", async (event) => {
                 event.preventDefault();
-                await fetch("/auth/logout", { method: "POST" });
+                await fetch("/auth/logout", 
+                    { method: "POST",
+                    headers: { "X-CSRF-Token": {{ csrf_token|tojson }} } 
+                });
                 window.location.replace("/auth/login");
             });
         }

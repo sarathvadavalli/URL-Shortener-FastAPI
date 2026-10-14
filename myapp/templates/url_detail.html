@@ -36,6 +36,7 @@
     </dl>
     <form method="post"
       action="/urls/{{ url.url_id }}/{% if url.is_active %}deactivate{% else %}activate{% endif %}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         {% if url.is_active %}
           <button class="btn btn-outline-danger" type="submit">Deactivate</button>
         {% else %}
