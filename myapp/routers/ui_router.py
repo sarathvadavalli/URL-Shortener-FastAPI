@@ -203,7 +203,7 @@ def view_analytics(request: Request, id: int, db: Session = Depends(get_db), use
     service = URLService(db)
     analytics = service.get_analytics(id, user)
     if analytics is None:
-        return RedirectResponse(url="/urls", status_code=status.HTTP_303_SEE_OTHER)
+        raise HTTPException(status_code=404, detail="Analytics not found")
 
     return render_template("analytics.html", {"request": request, "is_authenticated": True, "analytics": analytics})
 

@@ -2,6 +2,7 @@ from typing import Optional
 
 from fastapi import HTTPException
 from sqlalchemy import select, func
+from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
