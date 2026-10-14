@@ -33,10 +33,13 @@ def render_template(
 
 @router.get("/home", include_in_schema=False)
 def home(request: Request, db: Session = Depends(get_db), user: Users=Depends(get_current_user)):
-    total_urls = db.query(URLMapping).count()
-    total_clicks = db.query(Click).count()
     service = URLService(db)
-    recent = service.list_urls(user)[:10]
+   
+    values = service.get_summary(user)
+    total_urls = 0 if values[0] is None else values[0]
+    total_clicks = 0 if values[1] is None else values[1]
+
+    recent = service.list_urls(user)[:5]
     return render_template("home.html", {"request": request, "is_authenticated": True,  "total_urls": total_urls, "total_clicks": total_clicks, "recent": recent})
 
 
@@ -159,7 +162,7 @@ def url_detail(request: Request, id: int,
     if mapping is None:
         raise HTTPException(status_code=404, detail="URL mapping not found")
 
-    analytics = service.get_analytics(id) or []
+    analytics = service.get_recent_analytics(id, user) or []
 
     message = request.session.pop('message', None)
 
@@ -193,9 +196,9 @@ def deactivate_url(request: Request, id: int, db: Session = Depends(get_db), use
 @router.get("/urls/{id}/analytics/view", include_in_schema=False)
 def view_analytics(request: Request, id: int, db: Session = Depends(get_db), user: Users=Depends(get_current_user)):
     service = URLService(db)
-    analytics = service.get_analytics(id)
+    analytics = service.get_analytics(id, user)
     if analytics is None:
-        return RedirectResponse(url="/urls", status_code=status.HTTP_303_SEE_OTHER)
+        raise HTTPException(status_code=404, detail="Analytics not found")
 
     return render_template("analytics.html", {"request": request, "is_authenticated": True, "analytics": analytics})
 

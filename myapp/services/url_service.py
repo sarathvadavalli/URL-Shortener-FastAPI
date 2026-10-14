@@ -71,9 +71,14 @@ class URLService:
         
         return True
 
-    def get_analytics(self, url_id: int) -> Optional[list[Click]]:
-        return self.repository.get_analytics(url_id)
+    def get_summary(self, user: Users):
+        return self.repository.get_summary(user)
 
+    def get_recent_analytics(self, url_id: int, user: Users) -> Optional[list[Click]]:
+        return self.repository.get_recent_analytics(url_id, user)
+
+    def get_analytics(self, url_id: int, user: Users) -> Optional[list[Click]]:
+        return self.repository.get_analytics(url_id, user)
 
     def get_original_by_short_code(self, short_code: str):
         cache_key = f"url:{short_code}"
