@@ -61,6 +61,7 @@
         {% endif %}
 
         <form method="post" action="/urls" id="shortenUrlForm">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
           <input type="hidden" id="idempotencyKey" name="idempotency_key" value="{{ idempotency_key }}">
           <label class="url-input-label" for="originalUrl">Your destination URL</label>
           <div class="url-input-wrap">

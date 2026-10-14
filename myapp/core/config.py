@@ -1,31 +1,20 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
-import os
-from dotenv import load_dotenv
+from typing import Literal
 
-load_dotenv()
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "URL SHORTENER"
-    DATABASE_URL: str = os.getenv("DATABASE_URL")
-    REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379/1")
-
-    jwt_algorithm: str = os.getenv("JWT_ALGORITHM", "HS256")
-    jwt_access_token_expire_minutes: int = int(
-        os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "60")
-    )
-    jwt_secret_key: str = os.getenv("JWT_SECRET_KEY")
-    if not jwt_secret_key:
-        raise RuntimeError("CRITICAL: JWT_SECRET_KEY environment variable is not set!")
-
-    session_secret_key: str = os.getenv("SESSION_SECRET_KEY")
-    if not session_secret_key:
-        raise RuntimeError("CRITICAL: SESSION_SECRET_KEY environment variable is not set!")
-
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        extra="ignore",
-    )
+    PROJECT_NAME: str = "URL Shortener"
+    DATABASE_URL: str
+    REDIS_URL: str = "redis://localhost:6379/1"
+    jwt_algorithm: Literal["HS256"] = "HS256"
+    jwt_access_token_expire_minutes: int = Field(default=60, ge=1)
+    jwt_secret_key: str = Field(min_length=1)
+    session_secret_key: str = Field(min_length=1)
+    cookie_secure: bool = True
+    shortener_domain: str = "url-shortener-fastapi-rato.onrender.com"
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 
 settings = Settings()

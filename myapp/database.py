@@ -1,59 +1,47 @@
-from sqlalchemy import create_engine, text
+import redis
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from myapp.core.config import settings
 
-import redis
-
-redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True)
+redis_client = redis.from_url(
+    settings.REDIS_URL,
+    decode_responses=True,
+    socket_connect_timeout=0.5,
+    socket_timeout=0.5,
+)
 
 
 class Base(DeclarativeBase):
     pass
 
 
-engine = create_engine(settings.DATABASE_URL, echo=False)
-SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+engine = create_engine(settings.DATABASE_URL, pool_pre_ping=True)
+
+
+def configure_sqlite_transactions(target):
+    if target.dialect.name != "sqlite":
+        return
+
+    @event.listens_for(target, "connect")
+    def connect(conn, _):
+        conn.isolation_level = None
+        conn.execute("PRAGMA foreign_keys=ON")
+
+    @event.listens_for(target, "begin")
+    def begin(conn):
+        conn.exec_driver_sql("BEGIN")
+
+
+configure_sqlite_transactions(engine)
+SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
 
 def get_db():
-    init_db()
-    db = SessionLocal()
-    try:
+    with SessionLocal() as db:
         yield db
-    finally:
-        db.close()
-
-
-def ensure_database():
-    global engine, SessionLocal
-
-    try:
-        with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
-            return
-    except Exception as exc:
-        message = str(exc)
-        if "Unknown database" not in message and "1049" not in message:
-            raise
-
-        database_name = engine.url.database
-        if not database_name:
-            raise RuntimeError("Database name is missing in DATABASE_URL")
- 
-        admin_url = str(engine.url).replace(f"/{database_name}", "/mysql")
-        admin_engine = create_engine(admin_url, echo=False)
-        try:
-            with admin_engine.connect() as conn:
-                conn.execute(text(f"CREATE DATABASE IF NOT EXISTS `{database_name}`"))
-        finally:
-            admin_engine.dispose()
-
-        engine.dispose()
-        engine = create_engine(settings.DATABASE_URL, echo=False)
-        SessionLocal.configure(bind=engine)
 
 
 def init_db():
-    ensure_database()
+    # Fresh installations only. Existing schemas require `alembic upgrade head`.
     Base.metadata.create_all(bind=engine)

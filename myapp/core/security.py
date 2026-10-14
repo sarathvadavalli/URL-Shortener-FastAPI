@@ -1,6 +1,9 @@
-import base64, hashlib, hmac
-import os, json
-from datetime import datetime, timedelta, timezone
+import base64
+import hashlib
+import hmac
+import json
+import os
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import Cookie, Depends, HTTPException
@@ -32,11 +35,13 @@ def verify_password(password: str, password_hash: str) -> bool:
         if algorithm != "pbkdf2_sha256":
             return False
 
+        if iterations != "100000":
+            return False
         digest = hashlib.pbkdf2_hmac(
             "sha256",
             password.encode("utf-8"),
-            base64.b64decode(salt),
-            int(iterations),
+            base64.b64decode(salt, validate=True),
+            100_000,
         )
         return hmac.compare_digest(
             base64.b64encode(digest).decode(),
@@ -56,7 +61,7 @@ def _base64url_decode(value: str) -> bytes:
 
 
 def create_access_token(subject: str) -> str:
-    expires_at = datetime.now(timezone.utc) + timedelta(
+    expires_at = datetime.now(UTC) + timedelta(
         minutes=app_settings.jwt_access_token_expire_minutes
     )
     header = {"alg": app_settings.jwt_algorithm, "typ": "JWT"}
@@ -80,7 +85,10 @@ def decode_access_token(token: str) -> dict[str, Any]:
     try:
         encoded_header, encoded_payload, encoded_signature = token.split(".")
         header = json.loads(_base64url_decode(encoded_header))
-        if header.get("alg") != app_settings.jwt_algorithm:
+        if (
+            not isinstance(header, dict)
+            or header.get("alg") != app_settings.jwt_algorithm
+        ):
             raise ValueError("Unsupported token algorithm.")
 
         signing_input = f"{encoded_header}.{encoded_payload}".encode("ascii")
@@ -96,9 +104,14 @@ def decode_access_token(token: str) -> dict[str, Any]:
             raise ValueError("Invalid token signature.")
 
         payload = json.loads(_base64url_decode(encoded_payload))
+        if not isinstance(payload, dict):
+            raise ValueError("Invalid token payload")
+        subject = payload.get("sub")
+        if not isinstance(subject, str) or not subject.strip():
+            raise ValueError("Invalid token subject")
         expires_at = payload.get("exp")
-        now = int(datetime.now(timezone.utc).timestamp())
-        if not isinstance(expires_at, int) or expires_at < now:
+        now = int(datetime.now(UTC).timestamp())
+        if type(expires_at) is not int or expires_at <= now:
             raise ValueError("Token expired.")
 
         return payload

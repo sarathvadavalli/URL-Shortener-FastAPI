@@ -1,73 +1,86 @@
 # URL Shortener
 
-URL shortener is a project built with FastAPI, SQLAlchemy and Redis, with Celery used for background processing. Rather than simple CRUD operations, it involves various design features that makes the application to perform well even at scale. It Uses Twitter Snowflake style algorithm to generate unique IDs and Base62 encoding technique to genarate short codes uniquely.
+A FastAPI URL shortener with SQLAlchemy/MySQL persistence, session-scoped guest creation, JWT cookie authentication, Redis destination caching and in-process background click analytics.
 
 ## Features
 
-- Create short URLs from long original URLs (Even without login)
-- JWT-based authentication
-- View, activate and deactivate URLs belonging to authenticated user
-- Track click counts and analytics of URLS created by authenticated user
-- Redirect users from a short code to the corresponding original URL quickly without waiting for click record insertion (Only if active)
-
-## Tech Stack
-
-- **Frontend**: HTML, CSS, Javascript
-- **Backend**: FastAPI, JWT Authentication, Pydantic, SQLALchemy ORM, Redis
-- **Database**: MySQL
+- Public URL creation returns **200 HTML**, including idempotent replay results.
+- Logged-in users can list, view, activate and deactivate their own URLs and view analytics.
+- Guest links have nullable user ownership and a random signed-session identity; no artificial user ID 0 is required. Guest links are public to redirect, but cannot be managed through authenticated user endpoints.
+- Database-generated BIGINT IDs are Base62 encoded. Allocation is safe across application workers that share this MySQL database; it does not coordinate independently writable databases.
+- A unique owner/URL SHA256 fingerprint prevents duplicate destinations per owner, including concurrent creation. Different owners receive separate links.
+- A transactional database idempotency ledger binds each UUID to an owner and canonical destination for 300 seconds. Retries return the original result; conflicting payloads return 409. Concurrent matching requests wait for the winning transaction. Database lock timeouts/deadlocks receive bounded retries, then 503.
+- Redis caches destination metadata for 3600 seconds. Every redirect first reads committed database state, so stale cache entries cannot bypass deactivation. Redis errors fall back to the database; cache deletion failure does not undo a committed deactivation. This favors correctness over eliminating the database read on cache hits.
+- Successful public redirects return 307. Unknown/inactive links return 404. Every successful GET schedules an independent click transaction; click row and counter increment commit together.
+- Forms and JSON authentication requests require a session CSRF token. JWT and session cookies are HttpOnly and Secure by default. HS256 is the only supported JWT algorithm; cookie expiry follows configured JWT lifetime.
 
 ## Architecture
 
-![System Architecture](Architecture.png)
+```mermaid
+flowchart TD
+    Browser["Browser"] --> App["FastAPI: forms, auth, redirects"]
+    App --> ORM["SQLAlchemy"]
+    ORM --> DB["MySQL: URLs, owners, idempotency"]
+    App --> Cache["Redis: optional destination cache"]
+    App --> Tasks["BackgroundTasks: click event"]
+    Tasks --> DB
+```
 
-## Backend Features
-
-- **ID Generation** — Twitter Snowflake style algorithm that combines UNIX timestamp and sequence number. (Can include workerid for distributed servers)
-- **ShortCode Generation** — Uses Base-62 Encoding technique to create short codes since it ensures uniqueness, keeps the length minimum and saves storage.
-- **Data Validation** — Validates the incoming long urls to check if they are in proper format and follow standard HTTP & HTTPS protocols.
-- **Authentication** — Uses JWT authentication technique that securely stores the token in a HttpOnly cookie with a limited expiry time.
-- **Database Integrity** — Ensures database integrity by adding unique constraint for (user_id, original_url) combination to ensure no duplicate urls are stored corresponding to a user, handling concurrency.
-- **Idempotency** — Redis-based idempotency keys with TTL to prevent processing duplicate short url creation requests.
-- **Caching** — Redis-based caching for fetching original url corresponding to a short url with minimum latency.
-- **Background processing** — Handles background tasks like creating click records and incrementing count with FastAPI BackgroundTasks class. (Can move to celery for heavy processing)
-- **Asynchronous task execution** — Executes the redirect requests asynchronously to avoid blocking the event loop.
+Redis is not an idempotency authority or a background-task broker. BackgroundTasks run inside the web process and are not durable across process termination. An in-flight redirect already authorized before deactivation may complete; subsequent database reads observe the inactive flag. The unused legacy Celery module is not used by the application.
 
 ## Setup
 
-1. Create and activate your virtual environment.
+Python 3.11+ and a provisioned MySQL database are required. Redis is optional for availability, but recommended for exercising the cache behavior.
 
 ```bash
 python -m venv .venv
-.venv\Scripts\activate
-```
-
-2. Install dependencies.
-
-```bash
+# Windows: .venv\Scripts\activate
+# Linux/macOS: source .venv/bin/activate
 python -m pip install -r requirements.txt
 ```
 
-3. Create and configure the variables in `.env` file as specified in .env.example.
-4. Start the uvicorn ASGI server.
+Copy `.env.example` to `.env`, configure database/Redis URLs and separate strong JWT/session secrets. Use `COOKIE_SECURE=false` only for local HTTP development; leave it true on HTTPS deployments. `SHORTENER_DOMAIN` controls self-link rejection. The URL library canonicalizes host/scheme, while meaningful path slashes, query and fragments are preserved. Usernames support ASCII letters/digits plus single `_` and `-` separators, starting and ending in letters/digits.
+
+For a **new, empty database**:
 
 ```bash
+alembic upgrade head
 uvicorn myapp.main:app --reload
 ```
 
-5. Make sure Redis is running locally on 127.0.0.1:6379 or create a live instance on a cloud platform like Upstash and specify its URL in .env
+For an **existing database**, first follow [the migration instructions](docs/approved-decisions.md#existing-database-migration). Do not run the fresh baseline against existing tables. The app no longer creates a missing MySQL database with administrative credentials. Start from the repository root so template/static paths resolve.
 
-Verify the Redis connection:
+Open `http://127.0.0.1:8000/` locally. To call form/JSON mutation endpoints directly, first GET `/urls/create` or `/auth/login`, retain the session cookie, then send its CSRF token as `csrf_token` in forms or `X-CSRF-Token` in JSON requests. Registration uses MX-domain validation; it does not prove a mailbox exists. Login accepts username or email.
+
+Expired idempotency ledger records can be cleaned in a maintenance window:
 
 ```bash
-   redis-cli ping  # Expected output: PONG
+python -m myapp.maintenance
 ```
 
-6. Open the UI at:
+Expiry is enforced even before cleanup. Results already committed remain in URL storage.
 
-```text
-http://127.0.0.1:8000/
+## Tests
+
+```bash
+python -m pip install -r requirements-dev.txt
+pytest -q
+ruff check myapp tests migrations
 ```
+
+The default suite uses disposable SQLite files, fake Redis and stubbed DNS. MySQL and real Redis integration tests require isolated services:
+
+```bash
+# Use only a disposable MySQL server; tests create/drop per-test schemas.
+# The configured database name must start with url_shortener_test.
+# The test user needs CREATE/DROP DATABASE rights on that disposable server.
+export TEST_MYSQL_URL='mysql+pymysql://root:test-password@127.0.0.1:3306/url_shortener_test'
+export TEST_REDIS_URL='redis://127.0.0.1:6379/0'
+pytest -q
+```
+
+PowerShell uses `$env:TEST_MYSQL_URL=...` and `$env:TEST_REDIS_URL=...`. Never point tests at production services. The GitHub Actions workflow runs both default and real-service suites. [Approved decisions and verification](docs/approved-decisions.md) describe the implemented behavior and remaining limitations.
 
 ## License
 
-This project does not include a license file by default.
+This repository currently has no license file.

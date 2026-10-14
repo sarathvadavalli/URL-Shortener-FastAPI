@@ -67,7 +67,7 @@
         const passwordInput = document.getElementById("password");
         const submitButton = document.getElementById("submitButton");
         const message = document.getElementById("message");
-        const error = "{{ error }}";
+        const error = {{ error|tojson }};
         let mode = "login";
 
         if(error){
@@ -120,7 +120,8 @@
                 const response = await fetch(`/auth/${mode}`, {
                     method: "POST",
                     headers: {
-                        "Content-Type": "application/json"
+                        "Content-Type": "application/json",
+                        "X-CSRF-Token": {{ csrf_token|tojson }}
                     },
                     body: JSON.stringify(payload)
                 });

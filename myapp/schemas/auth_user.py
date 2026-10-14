@@ -1,8 +1,7 @@
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, EmailStr, Field
-from pydantic import model_validator, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic_core import PydanticCustomError
 
 
@@ -13,7 +12,6 @@ class UserCreate(BaseModel):
     email: str
     password: str = Field(..., min_length=6)
 
-
     @model_validator(mode="before")
     @classmethod
     def check_missing_fields(cls, data: Any) -> Any:
@@ -21,16 +19,13 @@ class UserCreate(BaseModel):
             return data
 
         required_fields = cls.model_fields.keys()
-       
+
         missing_fields = [
             field
             for field in required_fields
             if field not in data
             or data[field] is None
-            or (
-                isinstance(data[field], str)
-                and not data[field].strip()
-            )
+            or (isinstance(data[field], str) and not data[field].strip())
         ]
 
         if missing_fields:
@@ -41,7 +36,6 @@ class UserCreate(BaseModel):
 
         return data
 
-
     @field_validator("username")
     @classmethod
     def validate_username(cls, value: str) -> str:
@@ -49,19 +43,13 @@ class UserCreate(BaseModel):
             raise ValueError("Username must contain only ASCII characters")
 
         if not value[0].isalnum() or not value[-1].isalnum():
-            raise ValueError(
-                "Username must start and end with a letter or digit"
-            )
+            raise ValueError("Username must start and end with a letter or digit")
 
-        if not all(c.isalnum() for c in value):
-            raise ValueError(
-                "Username can contain only letters, digits, '_' and '-'"
-            )
+        if not all(c.isalnum() or c in "_-" for c in value):
+            raise ValueError("Username can contain only letters, digits, '_' and '-'")
 
         if "__" in value or "--" in value or "_-" in value or "-_" in value:
-            raise ValueError(
-                "Username cannot contain consecutive '_' or '-'"
-            )
+            raise ValueError("Username cannot contain consecutive '_' or '-'")
 
         return value
 
