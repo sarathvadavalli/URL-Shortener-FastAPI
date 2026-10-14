@@ -1,1 +1,1 @@
-from myapp.main import app
+"""URL Shortener application package."""
