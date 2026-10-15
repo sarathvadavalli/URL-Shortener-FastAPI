@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, event
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from myapp.core.config import settings
@@ -12,7 +12,24 @@ class Base(DeclarativeBase):
     pass
 
 
-engine = create_engine(settings.DATABASE_URL, echo=False)
+engine = create_engine(settings.DATABASE_URL, pool_pre_ping=True)
+
+def configure_sqlite_transactions(target):
+    if target.dialect.name != "sqlite":
+        return
+
+    @event.listens_for(target, "connect")
+    def connect(conn, _):
+        conn.isolation_level = None
+        conn.execute("PRAGMA foreign_keys=ON")
+
+    @event.listens_for(target, "begin")
+    def begin(conn):
+        conn.exec_driver_sql("BEGIN")
+
+
+configure_sqlite_transactions(engine)
+
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 

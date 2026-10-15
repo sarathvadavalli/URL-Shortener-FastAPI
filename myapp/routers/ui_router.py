@@ -87,7 +87,7 @@ def create_form(request: Request, db: Session = Depends(get_db)):
                 "request": request, 
                 "action": "create", 
                 "is_authenticated": user is not None,
-                # "idempotency_key": str(uuid4()),
+                "idempotency_key": str(uuid4()),
             }
         )
 
@@ -117,10 +117,10 @@ def create_url(request: Request, original_url: str = Form(...), idempotency_key:
             user = get_current_user(token, db)
             user_id = user.id
 
-        idempotency_key = f"idempotency:url-create:{idempotency_key}"
+        cache_key = f"idempotency:url-create:{user_id}:{idempotency_key}"
 
         try:
-            if redis_client.get(idempotency_key) == 'success':
+            if redis_client.get(cache_key) == 'success':
                 return RedirectResponse(
                     url="/urls/create",
                     status_code=status.HTTP_303_SEE_OTHER,
@@ -141,7 +141,7 @@ def create_url(request: Request, original_url: str = Form(...), idempotency_key:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-        redis_client.set(idempotency_key, "success", ex=300)
+        redis_client.set(cache_key, "success", ex=300)
 
         return render_template("url_form.html", 
             {

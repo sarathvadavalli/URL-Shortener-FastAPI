@@ -11,7 +11,10 @@ class URLMapping(Base):
     __tablename__ = "url_mappings"
 
     # BigInteger because it has to store ids of more than 32-bits (~50-bits)
-    url_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    # SQLite requires INTEGER for automatic primary-key generation.
+    url_id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True
+    )
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
     # Estimated max_length: 2048 (As ~2,000 characters can ensure cross-browser compatibility)
     original_url: Mapped[str] = mapped_column(String(2048), nullable=False)
