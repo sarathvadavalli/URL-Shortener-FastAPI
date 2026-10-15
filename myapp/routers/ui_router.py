@@ -1,3 +1,4 @@
+import logger
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Request, Form, Depends
@@ -118,11 +119,14 @@ def create_url(request: Request, original_url: str = Form(...), idempotency_key:
 
         idempotency_key = f"idempotency:url-create:{idempotency_key}"
 
-        if redis_client.get(idempotency_key) == 'success':
-            return RedirectResponse(
-                url="/urls/create",
-                status_code=status.HTTP_303_SEE_OTHER,
-            )
+        try:
+            if redis_client.get(idempotency_key) == 'success':
+                return RedirectResponse(
+                    url="/urls/create",
+                    status_code=status.HTTP_303_SEE_OTHER,
+                )
+        except RedisError:
+            logger.warning("Redis unavailable. Creating shorturl for entered url.")
 
         service = URLService(db)
         mapping = service.create_url(

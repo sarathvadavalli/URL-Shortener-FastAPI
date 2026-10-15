@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     if not session_secret_key:
         raise RuntimeError("CRITICAL: SESSION_SECRET_KEY environment variable is not set!")
 
+    password: str = os.getenv("ANONYMOUS_USER_PASSWORD")
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

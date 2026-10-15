@@ -2,10 +2,12 @@ from fastapi import FastAPI, Request, HTTPException, status
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse, JSONResponse
 from starlette.middleware.sessions import SessionMiddleware
+from sqlalchemy import text
 
 from myapp.core.config import settings
 from myapp.database import SessionLocal, init_db
 from myapp.models.url_mapping import URLMapping, Click
+from myapp.models.user_model import Users
 from myapp.routers.ui_router import router as ui_router
 from myapp.routers.auth_router import router as auth_router
 
@@ -61,8 +63,25 @@ def startup_event():
 
 
 def seed_url_mappings():
+    """Run at startup; create the anonymous user if missing and URLs if empty."""
     db = SessionLocal()
     try:
+        if db.get(Users, 0) is None:
+            try:
+                db.add(Users(
+                    id=0,
+                    first_name="Anonymous",
+                    last_name="User",
+                    user_name="anonymous",
+                    email="anonymous@example.com",
+                    password=settings.password
+                ))
+                
+                db.flush()
+            finally:
+                if original_sql_mode is not None:
+                    connection.execute(text("SET SESSION sql_mode = :mode"), {"mode": original_sql_mode})
+
         if db.query(URLMapping).count() == 0:
             initial_url_mappings = [
                 URLMapping(
@@ -77,6 +96,9 @@ def seed_url_mappings():
                 ),
             ]
             db.add_all(initial_url_mappings)
-            db.commit()
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()
