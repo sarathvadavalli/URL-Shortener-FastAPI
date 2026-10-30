@@ -1,6 +1,6 @@
 # URL Shortener
 
-URL shortener is a project built with FastAPI, SQLAlchemy and Redis, with Celery used for background processing. Rather than simple CRUD operations, it involves various design features that makes the application to perform well even at scale. It Uses Twitter Snowflake style algorithm to generate unique IDs and Base62 encoding technique to genarate short codes uniquely.
+URL shortener is a project built with FastAPI, SQLAlchemy, Redis and background processing. Rather than simple CRUD operations, it involves various design features that makes the application to perform well even at scale. It Uses Twitter Snowflake style algorithm to generate unique IDs and Base62 encoding technique to genarate short codes uniquely.
 
 ## Features
 
